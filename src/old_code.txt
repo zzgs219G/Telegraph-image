@@ -12,6 +12,7 @@ const CONTENT_TYPE_MAP = {
   'webm': 'video/webm'
 };
 
+
 const CACHE_CONFIG = {
   HTML: 3600,
   IMAGE: 86400,
