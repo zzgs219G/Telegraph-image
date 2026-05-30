@@ -48,7 +48,8 @@ const UploaderPage: React.FC = () => {
   const [isCompressing, setIsCompressing] = useState(true);
   const [showCache, setShowCache] = useState(false);
   const [cache, setCache] = useState<CachedUpload[]>(() => {
-    const localCache = localStorage.getItem('uploadCache');
+    if (typeof window === 'undefined') return [];
+    const localCache = window.localStorage.getItem('uploadCache');
     return localCache ? JSON.parse(localCache) : [];
   });
   const [isDragging, setIsDragging] = useState(false);
@@ -94,7 +95,7 @@ const UploaderPage: React.FC = () => {
           };
           const newCache = [...cache, newCacheItem];
           setCache(newCache);
-          localStorage.setItem('uploadCache', JSON.stringify(newCache));
+          window.localStorage.setItem('uploadCache', JSON.stringify(newCache));
         } else if (res.error) {
           alert(`上传失败: ${res.error}`);
         }
