@@ -1,0 +1,52 @@
+---
+import Layout from '../layouts/Layout.astro';
+import AdminGallery from '../components/AdminGallery';
+
+export const prerender = false;
+
+// Authenticate and path check
+import { env } from "cloudflare:workers";
+
+const { adminPath } = Astro.params;
+const envAdminPath = env.ADMIN_PATH;
+
+if (!envAdminPath || adminPath !== envAdminPath) {
+  return new Response('Not Found', { status: 404 });
+}
+
+// Optionally handle Basic Auth here for the Astro page itself,
+// though the original code protected the admin *API* and the *page load*.
+// Let's implement the page load auth here to be 100% equivalent.
+const authHeader = Astro.request.headers.get('Authorization');
+const username = env.USERNAME;
+const password = env.PASSWORD;
+const enableAuth = env.ENABLE_AUTH === 'true';
+
+if (enableAuth && username && password) {
+  let isAuthenticated = false;
+  if (authHeader && authHeader.startsWith('Basic ')) {
+    try {
+      const base64Credentials = authHeader.split(' ')[1];
+      const credentials = atob(base64Credentials).split(':');
+      if (credentials[0] === username && credentials[1] === password) {
+        isAuthenticated = true;
+      }
+    } catch (e) {
+      // Decode error
+    }
+  }
+
+  if (!isAuthenticated) {
+    return new Response('Unauthorized', {
+      status: 401,
+      headers: { 'WWW-Authenticate': 'Basic realm="Admin"' }
+    });
+  }
+}
+---
+
+<Layout>
+  <div class="w-full h-full min-h-screen">
+    <AdminGallery client:load />
+  </div>
+</Layout>
