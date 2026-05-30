@@ -1,13 +1,8 @@
-import axios from 'axios';
 import type { UploadResponse, AdminResponse, BingResponse } from '../types';
 
-export const api = axios.create({
-  baseURL: '/api'
-});
-
 export const getBingImages = async (): Promise<BingResponse> => {
-  const { data } = await api.get('/bing');
-  return data;
+  const res = await fetch('/api/bing');
+  return await res.json();
 };
 
 export const uploadFile = async (file: File, onProgress?: (percent: number) => void): Promise<UploadResponse> => {
@@ -15,49 +10,55 @@ export const uploadFile = async (file: File, onProgress?: (percent: number) => v
   formData.append('file', file);
 
   try {
-    const { data } = await api.post('/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      },
-      onUploadProgress: (progressEvent) => {
-        if (progressEvent.total) {
+    return await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload');
+
+      xhr.upload.onprogress = (progressEvent) => {
+        if (progressEvent.lengthComputable && onProgress) {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          if (onProgress) {
-            onProgress(percentCompleted);
-          }
+          onProgress(percentCompleted);
         }
-      }
+      };
+
+      xhr.onload = () => {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          resolve(data);
+        } catch (e) {
+          reject(e);
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Network error'));
+      xhr.send(formData);
     });
-    return data;
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.data) {
-      return error.response.data;
-    }
     return { error: error instanceof Error ? error.message : 'Unknown error' };
   }
 };
 
 export const getAdminMedia = async (page: number, token: string): Promise<AdminResponse> => {
-  const { data } = await api.get(`/manage?page=${page}`, {
+  const res = await fetch(`/api/manage?page=${page}`, {
     headers: {
       Authorization: `Basic ${token}`
     }
   });
-  return data;
+  return await res.json();
 };
 
 export const deleteAdminMedia = async (urls: string[], token: string): Promise<{ message?: string; error?: string }> => {
   try {
-    const { data } = await api.post('/delete', urls, {
+    const res = await fetch('/api/delete', {
+      method: 'POST',
       headers: {
-        Authorization: `Basic ${token}`
-      }
+        Authorization: `Basic ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(urls)
     });
-    return data;
+    return await res.json();
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.data) {
-      return error.response.data;
-    }
     return { error: error instanceof Error ? error.message : 'Unknown error' };
   }
 };
