@@ -36,4 +36,7 @@ dist/
 .env
 *.class
 *.apk
-*.ipa
+*.ipanode_modules/
+dist/
+.astro/
+.wrangler/
