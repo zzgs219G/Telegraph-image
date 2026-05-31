@@ -1,9 +1,9 @@
 name: Sync to Sub-Account
 
-于:
+on:
   push:
     branches:
-      - main  # 如果大号是 master，请改成 master
+      - main
 
 jobs:
   repo-sync:
