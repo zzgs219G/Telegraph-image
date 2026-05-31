@@ -9,8 +9,21 @@ jobs:
   repo-sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Mirror the HTTP repository
-        uses: s0/git-publish-action@main
-        env:
-          REMOTE_URL: "https://github.com/xi118/Telegraph-image.git"
-          API_TOKEN_GITHUB: ${{ secrets.SYNC_TOKEN }}
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Force Sync to Sub-Account
+        uses: pixta-dev/repository-mirroring-action@v1
+        with:
+          target_repo_url: "git@github.com:xi118/Telegraph-image.git"
+          ssh_private_key: ${{ secrets.SYNC_TOKEN }}
+        continue-on-error: true
+
+      - name: Alternative Sync Method
+        if: ${{ failure() || success() }}
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          git push --force https://x-access-token:${{ secrets.SYNC_TOKEN }}@github.com/xi118/Telegraph-image.git main:main
