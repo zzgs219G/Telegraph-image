@@ -13,11 +13,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false  # 【就是这一行！】强制删掉大号的默认身份缓存
 
       - name: Sync Push
         run: |
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
           
-          # 【核心改变】换成了专门针对私人仓库的高权限强制推流写法
+          # 用干净的身份，带着万能钥匙全速冲锋
           git push --force https://x-access-token:${{ secrets.SYNC_TOKEN }}@github.com/xi118/Telegraph-image.git main:main
