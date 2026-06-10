@@ -3,11 +3,12 @@ main = "src/worker/index.ts"
 compatibility_date = "2026-06-10"
 compatibility_flags = ["nodejs_compat"]
 
+keep_vars = true
+
 [assets]
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-
 
 [triggers]
 crons = ["0 2 * * *"]
