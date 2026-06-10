@@ -9,11 +9,5 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 
 
-
-[vars]
-DOMAIN = "tg-image.614118.xyz"
-ENABLE_AUTH = "false"
-MAX_SIZE_MB = "20"
-
 [triggers]
 crons = ["0 2 * * *"]
