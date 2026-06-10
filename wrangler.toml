@@ -5,6 +5,11 @@ compatibility_flags = ["nodejs_compat"]
 
 keep_vars = true
 
+[[d1_databases]]
+binding = "DATABASE"
+database_name = "tg-image-db"
+database_id = "5f042add-2054-4080-8868-281f50015d8e"
+
 [assets]
 directory = "./dist"
 binding = "ASSETS"
