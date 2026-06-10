@@ -1,0 +1,13 @@
+name = "tg-image"
+main = "src/worker/index.ts"
+compatibility_date = "2026-06-10"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+
+[triggers]
+crons = ["0 2 * * *"]
