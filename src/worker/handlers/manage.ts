@@ -21,8 +21,8 @@ export async function handleManage(request: Request, env: Env): Promise<Response
       FROM media m
       LEFT JOIN tags t ON m.tag_id = t.id
     `;
-    const countValues: any[] = [];
-    const dataValues: any[] = [];
+    const countValues: unknown[] = [];
+    const dataValues: unknown[] = [];
 
     if (tagIdParam) {
       countQuery += ' WHERE tag_id = ?';
@@ -39,7 +39,7 @@ export async function handleManage(request: Request, env: Env): Promise<Response
 
     const mediaDataResult = await config.database.prepare(dataQuery).bind(...dataValues).all();
 
-    const mediaData = mediaDataResult.results.map((row: any) => ({
+    const mediaData = mediaDataResult.results.map((row: unknown) => ({
       fileId: row.fileId,
       url: `https://${config.domain}${row.url}`,
       tag_id: row.tag_id,
@@ -58,7 +58,7 @@ export async function handleManage(request: Request, env: Env): Promise<Response
         totalPages
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('获取媒体数据失败:', error);
     return jsonResponse({ error: '获取媒体数据失败', details: error.message }, 500);
   }

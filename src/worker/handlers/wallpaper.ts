@@ -32,7 +32,7 @@ export async function handleWallpaper(_request: Request, env: Env): Promise<Resp
     const returnData = {
       status: true,
       message: "操作成功",
-      data: result.results.map((row: any) => ({ url: `https://${config.domain}${row.url}` }))
+      data: result.results.map((row: unknown) => ({ url: `https://${config.domain}${row.url}` }))
     };
 
     return new Response(JSON.stringify(returnData), {
@@ -43,7 +43,7 @@ export async function handleWallpaper(_request: Request, env: Env): Promise<Resp
         'CDN-Cache-Control': `public, max-age=${CACHE_CONFIG.API}`
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return new Response(JSON.stringify({ error: '获取壁纸失败', details: error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

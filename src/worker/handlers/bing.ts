@@ -24,7 +24,7 @@ export async function handleBing(_request: Request, _env: Env): Promise<Response
     }
 
     const bingData = await res.json() as any;
-    const images = bingData.images.map((image: any) => ({
+    const images = bingData.images.map((image: unknown) => ({
       url: `https://cn.bing.com${image.url}`
     }));
 
@@ -45,7 +45,7 @@ export async function handleBing(_request: Request, _env: Env): Promise<Response
 
     await cache.put(cacheKey, response.clone());
     return response;
-  } catch (error: any) {
+  } catch (error: unknown) {
     return new Response(JSON.stringify({ error: '请求 Bing API 失败', details: error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

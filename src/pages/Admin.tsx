@@ -128,7 +128,7 @@ const AdminPage: React.FC = () => {
       await createTag(name, color, token);
       await fetchTags();
       setIsTagModalOpen(false);
-    } catch (e: any) {
+    } catch (e: unknown) {
       alert(`创建失败: ${e.response?.data?.error || e.message}`);
     } finally {
       setIsSubmittingTag(false);
@@ -143,7 +143,7 @@ const AdminPage: React.FC = () => {
       if (activeTagId === id) setActiveTagId(null);
       await fetchTags();
       await loadPage(page, activeTagId === id ? null : activeTagId);
-    } catch (e: any) {
+    } catch (e: unknown) {
       alert(`删除失败: ${e.message}`);
     } finally {
       setIsDeletingTag(null);
@@ -158,7 +158,7 @@ const AdminPage: React.FC = () => {
       setSelectedKeys(new Set());
       fetchTags();
       loadPage(page);
-    } catch (e: any) {
+    } catch (e: unknown) {
       alert(`操作失败: ${e.message}`);
     }
   };
@@ -170,7 +170,7 @@ const AdminPage: React.FC = () => {
       alert(`抓取完成：成功 ${res.success} 张，跳过 ${res.skipped} 张已存在`);
       fetchTags();
       loadPage(1);
-    } catch (e: any) {
+    } catch (e: unknown) {
       alert(`抓取失败: ${e.message}`);
     } finally {
       setIsCrawlingBing(false);

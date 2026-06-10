@@ -59,7 +59,7 @@ export async function crawlBingWallpapers(env: Env, manual: boolean = false): Pr
     if (manual) {
       return jsonResponse({ success: successCount, skipped: skippedCount, message: '抓取完成' });
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Bing Crawl Error:', e);
     if (manual) {
       return jsonResponse({ error: '抓取失败', details: e.message }, 500);

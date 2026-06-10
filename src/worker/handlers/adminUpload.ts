@@ -70,7 +70,7 @@ export async function handleAdminUpload(request: Request, env: Env): Promise<Res
     if (!inserted) throw new Error('无法生成唯一路径，请重试');
 
     return jsonResponse({ data: `https://${config.domain}${imagePath}` });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('内部服务器错误:', error);
     return jsonResponse({ error: error.message }, 500);
   }

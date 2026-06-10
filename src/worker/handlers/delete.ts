@@ -32,7 +32,7 @@ export async function handleDelete(request: Request, env: Env): Promise<Response
     }
 
     return jsonResponse({ message: '删除成功' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return jsonResponse({ error: '删除失败', details: error.message }, 500);
   }
 }

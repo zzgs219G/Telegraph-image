@@ -45,7 +45,7 @@ export function extractConfig(env: Env) {
   };
 }
 
-export function jsonResponse(data: any, status = 200): Response {
+export function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: { 'Content-Type': 'application/json' }

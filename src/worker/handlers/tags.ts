@@ -19,7 +19,7 @@ export async function handleTags(request: Request, env: Env): Promise<Response> 
         ORDER BY t.id ASC
       `).all();
       return jsonResponse({ data: result.results });
-    } catch (e: any) {
+    } catch (e: unknown) {
       return jsonResponse({ error: '获取标签失败', details: e.message }, 500);
     }
   }
@@ -40,7 +40,7 @@ export async function handleTags(request: Request, env: Env): Promise<Response> 
       ).bind(name, color).first();
 
       return jsonResponse({ data: result });
-    } catch (e: any) {
+    } catch (e: unknown) {
       return jsonResponse({ error: '创建标签失败', details: e.message }, 500);
     }
   }
@@ -56,7 +56,7 @@ export async function handleTags(request: Request, env: Env): Promise<Response> 
         await config.database.prepare('DELETE FROM tags WHERE id = ?').bind(id).run();
         // tag_id on media is set to NULL automatically via ON DELETE SET NULL
         return jsonResponse({ message: '删除成功' });
-      } catch (e: any) {
+      } catch (e: unknown) {
         return jsonResponse({ error: '删除标签失败', details: e.message }, 500);
       }
     }
@@ -68,7 +68,7 @@ export async function handleTags(request: Request, env: Env): Promise<Response> 
         if (!name && !color) return jsonResponse({ error: 'name or color required' }, 400);
 
         const updates: string[] = [];
-        const values: any[] = [];
+        const values: unknown[] = [];
         if (name) { updates.push('name = ?'); values.push(name); }
         if (color) { updates.push('color = ?'); values.push(color); }
         values.push(id);
@@ -77,7 +77,7 @@ export async function handleTags(request: Request, env: Env): Promise<Response> 
         await config.database.prepare(query).bind(...values).run();
 
         return jsonResponse({ message: '更新成功' });
-      } catch (e: any) {
+      } catch (e: unknown) {
         return jsonResponse({ error: '更新标签失败', details: e.message }, 500);
       }
     }
@@ -95,7 +95,7 @@ export async function handleTags(request: Request, env: Env): Promise<Response> 
 
       const result = await config.database.prepare(query).bind(...bindValues).run();
       return jsonResponse({ message: '批量打标签成功', count: result.meta.changes });
-    } catch (e: any) {
+    } catch (e: unknown) {
       return jsonResponse({ error: '批量打标签失败', details: e.message }, 500);
     }
   }

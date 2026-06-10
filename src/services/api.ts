@@ -16,7 +16,7 @@ export const uploadFile = async (file: File, onProgress?: (percent: number) => v
 
   try {
     const url = adminMode ? '/admin/upload' : '/upload';
-    const config: any = {
+    const config: unknown = {
       headers: {
         'Content-Type': 'multipart/form-data'
       },
