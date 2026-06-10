@@ -53,9 +53,9 @@ export function jsonResponse(data: any, status = 200): Response {
 }
 
 export function unauthorizedResponse(): Response {
-  return new Response('Unauthorized', {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
-    headers: { 'WWW-Authenticate': 'Basic realm="Admin"' }
+    headers: { 'Content-Type': 'application/json' }
   });
 }
 
