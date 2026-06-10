@@ -8,13 +8,10 @@ directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
-[[d1_databases]]
-binding = "DATABASE"
-database_name = "tg-image-db"
-database_id = "5f042add-2054-4080-8868-281f50015d8e"
+
 
 [vars]
-DOMAIN = "img.example.com"
+DOMAIN = "tg-image.614118.xyz"
 ENABLE_AUTH = "false"
 MAX_SIZE_MB = "20"
 
