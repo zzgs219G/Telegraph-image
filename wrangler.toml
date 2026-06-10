@@ -10,8 +10,8 @@ not_found_handling = "single-page-application"
 
 [[d1_databases]]
 binding = "DATABASE"
-database_name = "telegraph-image-db"
-database_id = "<YOUR_D1_DATABASE_ID>"
+database_name = "tg-image-db"
+database_id = "5f042add-2054-4080-8868-281f50015d8e"
 
 [vars]
 DOMAIN = "img.example.com"
