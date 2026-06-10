@@ -16,7 +16,7 @@ INSERT OR IGNORE INTO tags (name, color) VALUES
 ALTER TABLE media ADD COLUMN tag_id     INTEGER REFERENCES tags(id) ON DELETE SET NULL;
 ALTER TABLE media ADD COLUMN filename   TEXT;
 ALTER TABLE media ADD COLUMN size       INTEGER;
-ALTER TABLE media ADD COLUMN source_url TEXT UNIQUE;  -- 必应去重用
+ALTER TABLE media ADD COLUMN source_url TEXT;  -- 必应去重用
 ALTER TABLE media ADD COLUMN created_at INTEGER NOT NULL DEFAULT (unixepoch());
 
 -- 索引
