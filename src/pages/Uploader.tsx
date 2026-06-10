@@ -10,13 +10,25 @@ export interface UploaderProps {
 }
 
 const calculateHash = async (file: File) => {
-  const chunkSize = 1024 * 1024;
-  const chunk = file.size > chunkSize ? file.slice(0, chunkSize) : file;
-  const arrayBuffer = await chunk.arrayBuffer();
-  const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hash = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
-  return `${hash}-${file.size}-${file.lastModified}`;
+  try {
+    if (!crypto || !crypto.subtle) {
+      throw new Error('crypto.subtle is not available');
+    }
+    const chunkSize = 1024 * 1024;
+    const chunk = file.size > chunkSize ? file.slice(0, chunkSize) : file;
+    const arrayBuffer = await chunk.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hash = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+    return `${hash}-${file.size}-${file.lastModified}`;
+  } catch {
+    // Fallback for environments without crypto.subtle (e.g. non-HTTPS)
+    const simpleHash = file.name.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+    return `fallback-${Math.abs(simpleHash)}-${file.size}-${file.lastModified}`;
+  }
 };
 
 const compressImage = async (file: File, quality = 0.75): Promise<File> => {
@@ -28,22 +40,34 @@ const compressImage = async (file: File, quality = 0.75): Promise<File> => {
       if (!ctx) return resolve(file);
       canvas.width = image.width;
       canvas.height = image.height;
-      ctx.drawImage(image, 0, 0, image.width, image.height);
-      canvas.toBlob((blob) => {
-        if (blob) {
-          resolve(new File([blob], file.name, { type: 'image/jpeg' }));
-        } else {
-          resolve(file);
-        }
-      }, 'image/jpeg', quality);
+      try {
+        ctx.drawImage(image, 0, 0, image.width, image.height);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+          } else {
+            resolve(file);
+          }
+        }, 'image/jpeg', quality);
+      } catch {
+        resolve(file);
+      }
     };
+    image.onerror = () => resolve(file);
     const reader = new FileReader();
     reader.onload = (event) => {
       if (event.target?.result) {
         image.src = event.target.result as string;
+      } else {
+        resolve(file);
       }
     };
-    reader.readAsDataURL(file);
+    reader.onerror = () => resolve(file);
+    try {
+      reader.readAsDataURL(file);
+    } catch {
+      resolve(file);
+    }
   });
 };
 
@@ -62,62 +86,67 @@ const UploaderPage: React.FC<UploaderProps> = ({ adminMode, token, onUploadSucce
 
   const handleFiles = async (files: File[]) => {
     for (const file of files) {
-      const fileHash = await calculateHash(file);
-      const existingCache = cache.find(c => c.hash === fileHash);
-
-      if (existingCache && !adminMode) {
-        if (!urls.includes(existingCache.url)) {
-          setUrls(prev => [...prev, existingCache.url]);
-        }
-        continue;
-      }
-
-      const tempId = Math.random().toString(36).substring(7);
-      setProgress(prev => ({ ...prev, [tempId]: 0 }));
-
       try {
-        let uploadableFile = file;
-        if (file.type.startsWith('image/') && file.type !== 'image/gif' && isCompressing) {
-          uploadableFile = await compressImage(file);
+        const fileHash = await calculateHash(file);
+        const existingCache = cache.find(c => c.hash === fileHash);
+
+        if (existingCache && !adminMode) {
+          if (!urls.includes(existingCache.url)) {
+            setUrls(prev => [...prev, existingCache.url]);
+          }
+          continue;
         }
 
-        const res = await uploadFile(uploadableFile, (p) => {
-          setProgress(prev => ({ ...prev, [tempId]: p }));
-        }, adminMode, token);
+        const tempId = Math.random().toString(36).substring(7);
+        setProgress(prev => ({ ...prev, [tempId]: 0 }));
 
-        if (res.data) {
-          const newUrl = res.data;
-          setUrls(prev => [...prev, newUrl]);
-
-          if (onUploadSuccess) {
-            onUploadSuccess(newUrl);
+        try {
+          let uploadableFile = file;
+          if (file.type.startsWith('image/') && file.type !== 'image/gif' && isCompressing) {
+            uploadableFile = await compressImage(file);
           }
 
-          if (!adminMode) {
-            const preview = URL.createObjectURL(file);
-            setThumbnails(prev => [...prev, { url: newUrl, preview, type: file.type }]);
+          const res = await uploadFile(uploadableFile, (p) => {
+            setProgress(prev => ({ ...prev, [tempId]: p }));
+          }, adminMode, token);
 
-            const newCacheItem: CachedUpload = {
-              url: newUrl,
-              fileName: file.name,
-              hash: fileHash,
-              timestamp: new Date().toLocaleString('zh-CN', { hour12: false })
-            };
-            const newCache = [...cache, newCacheItem];
-            setCache(newCache);
-            localStorage.setItem('uploadCache', JSON.stringify(newCache));
+          if (res.data) {
+            const newUrl = res.data;
+            setUrls(prev => [...prev, newUrl]);
+
+            if (onUploadSuccess) {
+              onUploadSuccess(newUrl);
+            }
+
+            if (!adminMode) {
+              const preview = URL.createObjectURL(file);
+              setThumbnails(prev => [...prev, { url: newUrl, preview, type: file.type }]);
+
+              const newCacheItem: CachedUpload = {
+                url: newUrl,
+                fileName: file.name,
+                hash: fileHash,
+                timestamp: new Date().toLocaleString('zh-CN', { hour12: false })
+              };
+              const newCache = [...cache, newCacheItem];
+              setCache(newCache);
+              localStorage.setItem('uploadCache', JSON.stringify(newCache));
+            }
+          } else if (res.error) {
+            alert(`上传失败: ${res.error}`);
           }
-        } else if (res.error) {
-          alert(`上传失败: ${res.error}`);
+        } catch {
+          alert('上传过程中发生错误');
+        } finally {
+          setProgress(prev => {
+            const next = { ...prev };
+            delete next[tempId];
+            return next;
+          });
         }
-      } catch {
-        alert('上传过程中发生错误');
-      } finally {
-        setProgress(prev => {
-          const next = { ...prev };
-          delete next[tempId];
-          return next;
-        });
+      } catch (err) {
+        console.error('处理文件时出错', err);
+        alert('处理文件时出错，请重试');
       }
     }
   };
