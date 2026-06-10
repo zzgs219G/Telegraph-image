@@ -47,17 +47,28 @@ export async function handleUpload(request: Request, env: Env): Promise<Response
     if (!fileId) throw new Error('返回的数据中没有文件 ID');
 
     const fileExtension = getFileExtension(file.name);
-    const timestamp = Date.now();
-    const imageURL = `https://${config.domain}/${timestamp}.${fileExtension}`;
 
     const tagResult = await config.database.prepare('SELECT id FROM tags WHERE name = ?').bind('前台上传').first();
     const tagId = tagResult?.id || null;
 
-    await config.database.prepare(
-      'INSERT INTO media (url, fileId, tag_id, filename, size) VALUES (?, ?, ?, ?, ?) ON CONFLICT(url) DO NOTHING'
-    ).bind(imageURL, fileId, tagId, file.name, file.size).run();
+    let imagePath: string = '';
+    let inserted = false;
+    for (let i = 0; i < 5; i++) {
+      const uniqueId = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+      imagePath = `/${uniqueId}.${fileExtension}`;
+      try {
+        const result = await config.database.prepare(
+          'INSERT INTO media (url, fileId, tag_id, filename, size) VALUES (?, ?, ?, ?, ?)'
+        ).bind(imagePath, fileId, tagId, file.name, file.size).run();
+        if (result.meta.changes > 0) { inserted = true; break; }
+      } catch {
+        // UNIQUE constraint，继续重试
+        continue;
+      }
+    }
+    if (!inserted) throw new Error('无法生成唯一路径，请重试');
 
-    return jsonResponse({ data: imageURL });
+    return jsonResponse({ data: `https://${config.domain}${imagePath}` });
   } catch (error: any) {
     console.error('内部服务器错误:', error);
     return jsonResponse({ error: error.message }, 500);

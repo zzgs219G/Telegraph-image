@@ -11,7 +11,7 @@ const AdminPage: React.FC = () => {
   const [token, setToken] = useState<string>('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('admin'); // Default usually
+  const [username, setUsername] = useState(''); // Default usually
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
@@ -28,6 +28,28 @@ const AdminPage: React.FC = () => {
   const [isSubmittingTag, setIsSubmittingTag] = useState(false);
   const [isDeletingTag, setIsDeletingTag] = useState<number | null>(null);
   const [isCrawlingBing, setIsCrawlingBing] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const cachedToken = sessionStorage.getItem('admin_token');
+    if (!cachedToken) return;
+    setIsLoading(true);
+    getAdminMedia(1, cachedToken)
+      .then((res) => {
+        if (res.data) {
+          setToken(cachedToken);
+          setIsAuthenticated(true);
+          setMedia(res.data);
+          setPage(res.pagination.page);
+          setTotalPages(res.pagination.totalPages);
+          setTotalCount(res.pagination.totalCount);
+        } else {
+          sessionStorage.removeItem('admin_token');
+        }
+      })
+      .catch(() => sessionStorage.removeItem('admin_token'))
+      .finally(() => setIsLoading(false));
+  }, []);
 
   const authenticate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +59,7 @@ const AdminPage: React.FC = () => {
       const res = await getAdminMedia(1, encodedToken);
       if (res.data) {
         setToken(encodedToken);
+        sessionStorage.setItem('admin_token', encodedToken);
         setIsAuthenticated(true);
         setMedia(res.data);
         setPage(res.pagination.page);
@@ -180,6 +203,14 @@ const AdminPage: React.FC = () => {
   };
 
   if (!isAuthenticated) {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-50">
+          <div className="text-slate-500 text-sm animate-pulse">正在验证登录状态...</div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <form onSubmit={authenticate} className="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm">
@@ -222,11 +253,21 @@ const AdminPage: React.FC = () => {
     <div className="h-screen flex flex-col bg-slate-50 overflow-hidden font-sans">
       <header className="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center shrink-0">
         <div className="flex items-center space-x-2">
+          <button
+            className="md:hidden p-1 mr-1 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-md transition-colors"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-600"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
           <h1 className="text-xl font-bold text-slate-800 tracking-tight">Telegraph 图床后台</h1>
         </div>
         <button
-          onClick={() => setIsAuthenticated(false)}
+          onClick={() => {
+            setIsAuthenticated(false);
+            setToken('');
+            sessionStorage.removeItem('admin_token');
+          }}
           className="text-sm text-slate-500 hover:text-slate-800 transition-colors"
         >
           退出登录
@@ -234,17 +275,55 @@ const AdminPage: React.FC = () => {
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        <Sidebar
-          tags={tags}
-          activeTagId={activeTagId}
-          onSelectTag={(id) => { setActiveTagId(id); setSelectedKeys(new Set()); }}
-          onNewTag={() => setIsTagModalOpen(true)}
-          onDeleteTag={handleDeleteTag}
-          isDeletingTag={isDeletingTag}
-          totalCount={tags.reduce((acc, t) => acc + (t.count || 0), 0) + (media.length > 0 && !tags.some(t => t.count) ? totalCount : 0)} // Approximation
-        />
+        {/* 桌面端固定侧边栏 */}
+        <div className="hidden md:block">
+          <Sidebar
+            tags={tags}
+            activeTagId={activeTagId}
+            onSelectTag={(id) => { setActiveTagId(id); setSelectedKeys(new Set()); }}
+            onNewTag={() => setIsTagModalOpen(true)}
+            onDeleteTag={handleDeleteTag}
+            isDeletingTag={isDeletingTag}
+            totalCount={tags.reduce((acc, t) => acc + (t.count || 0), 0) + (media.length > 0 && !tags.some(t => t.count) ? totalCount : 0)} // Approximation
+          />
+        </div>
 
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* 移动端抽屉 */}
+        {sidebarOpen && (
+          <div className="fixed inset-0 z-50 md:hidden flex">
+            <div
+              className="fixed inset-0 bg-black/50 transition-opacity"
+              onClick={() => setSidebarOpen(false)}
+            ></div>
+            <div className="relative flex w-64 max-w-xs flex-col bg-white">
+              <div className="absolute top-0 right-0 -mr-12 pt-2">
+                <button
+                  type="button"
+                  className="ml-1 flex h-10 w-10 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <span className="sr-only">Close sidebar</span>
+                  <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="h-full overflow-y-auto">
+                <Sidebar
+                  tags={tags}
+                  activeTagId={activeTagId}
+                  onSelectTag={(id) => { setActiveTagId(id); setSelectedKeys(new Set()); setSidebarOpen(false); }}
+                  onNewTag={() => setIsTagModalOpen(true)}
+                  onDeleteTag={handleDeleteTag}
+                  isDeletingTag={isDeletingTag}
+                  totalCount={tags.reduce((acc, t) => acc + (t.count || 0), 0) + (media.length > 0 && !tags.some(t => t.count) ? totalCount : 0)} // Approximation
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
           <Toolbar
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}

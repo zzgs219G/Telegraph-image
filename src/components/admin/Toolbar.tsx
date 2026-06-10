@@ -21,8 +21,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
   activeTag, onTriggerBingCrawl, isCrawlingBing
 }) => {
   return (
-    <div className="bg-white p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
-      <div className="flex-1 max-w-md relative w-full">
+    <div className="bg-white p-3 md:p-4 border-b border-slate-200 flex flex-col gap-3">
+      <div className="w-full relative">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
           <svg className="h-5 w-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
@@ -37,7 +37,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
         />
       </div>
 
-      <div className="flex items-center space-x-4 w-full sm:w-auto">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mb-1">
         {activeTag?.name === '必应壁纸' && (
           <button
             onClick={onTriggerBingCrawl}

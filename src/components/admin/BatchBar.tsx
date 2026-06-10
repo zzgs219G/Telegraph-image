@@ -19,8 +19,8 @@ const BatchBar: React.FC<BatchBarProps> = ({
   if (selectedCount === 0) return null;
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white rounded-2xl shadow-2xl px-6 py-4 flex items-center space-x-6 animate-in slide-in-from-bottom-10 fade-in duration-300">
-      <div className="flex items-center space-x-3 border-r border-slate-700 pr-6">
+    <div className="fixed bottom-4 left-4 right-4 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-auto z-40 bg-slate-900 text-white rounded-2xl shadow-2xl px-4 md:px-6 py-3 md:py-4 flex flex-wrap items-center justify-between md:justify-start gap-3 md:gap-6 animate-in slide-in-from-bottom-10 fade-in duration-300">
+      <div className="flex items-center space-x-3 md:border-r md:border-slate-700 md:pr-6 shrink-0">
         <div className="bg-indigo-500 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">
           {selectedCount}
         </div>

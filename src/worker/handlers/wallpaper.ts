@@ -32,7 +32,7 @@ export async function handleWallpaper(_request: Request, env: Env): Promise<Resp
     const returnData = {
       status: true,
       message: "操作成功",
-      data: result.results.map((row: any) => ({ url: row.url }))
+      data: result.results.map((row: any) => ({ url: `https://${config.domain}${row.url}` }))
     };
 
     return new Response(JSON.stringify(returnData), {

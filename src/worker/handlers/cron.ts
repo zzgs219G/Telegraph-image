@@ -47,12 +47,11 @@ export async function crawlBingWallpapers(env: Env, manual: boolean = false): Pr
       const fileId = responseData.result.document?.file_id;
       if (!fileId) continue;
 
-      const timestamp = Date.now();
-      const imageURL = `https://${config.domain}/${timestamp}.jpg`;
+      const imagePath = `/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.jpg`;
 
       await config.database.prepare(
         'INSERT INTO media (url, fileId, tag_id, source_url, filename, size) VALUES (?, ?, ?, ?, ?, ?)'
-      ).bind(imageURL, fileId, tagId, sourceUrl, file.name, file.size).run();
+      ).bind(imagePath, fileId, tagId, sourceUrl, file.name, file.size).run();
 
       successCount++;
     }

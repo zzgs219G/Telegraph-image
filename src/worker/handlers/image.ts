@@ -11,11 +11,11 @@ export async function handleImage(request: Request, env: Env): Promise<Response>
     const config = extractConfig(env);
 
     // We only process it if it's an image. Otherwise, fallback to env.ASSETS.fetch
-    const requestedUrl = url.origin + pathname;
     const cache = (caches as any).default as Cache;
+    const fullUrl = `https://${config.domain}${pathname}`;
 
     // ⚡ 核心改动 1：构造一个带有缓存行为的请求对象
-    const cacheKey = new Request(requestedUrl, {
+    const cacheKey = new Request(fullUrl, {
       cf: {
         cacheEverything: true,
         cacheTtl: CACHE_CONFIG.IMAGE
@@ -28,7 +28,7 @@ export async function handleImage(request: Request, env: Env): Promise<Response>
     try {
       const result = await config.database.prepare(
         'SELECT fileId FROM media WHERE url = ?'
-      ).bind(requestedUrl).first();
+      ).bind(pathname).first();
 
       if (!result) {
         return env.ASSETS.fetch(request); // Fallback to React static assets instead of immediately failing.

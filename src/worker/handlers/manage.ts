@@ -21,8 +21,8 @@ export async function handleManage(request: Request, env: Env): Promise<Response
       FROM media m
       LEFT JOIN tags t ON m.tag_id = t.id
     `;
-    let countValues: any[] = [];
-    let dataValues: any[] = [];
+    const countValues: any[] = [];
+    const dataValues: any[] = [];
 
     if (tagIdParam) {
       countQuery += ' WHERE tag_id = ?';
@@ -41,7 +41,7 @@ export async function handleManage(request: Request, env: Env): Promise<Response
 
     const mediaData = mediaDataResult.results.map((row: any) => ({
       fileId: row.fileId,
-      url: row.url,
+      url: `https://${config.domain}${row.url}`,
       tag_id: row.tag_id,
       filename: row.filename,
       size: row.size,
