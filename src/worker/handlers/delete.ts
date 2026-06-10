@@ -1,7 +1,7 @@
-import { extractConfig, authenticate, unauthorizedResponse, jsonResponse } from '../_utils.js';
+import { extractConfig, authenticate, unauthorizedResponse, jsonResponse } from '../utils';
+import type { Env } from '../utils';
 
-export async function onRequestPost(context) {
-  const { request, env } = context;
+export async function handleDelete(request: Request, env: Env): Promise<Response> {
   const config = extractConfig(env);
 
   if (!authenticate(request, config.username, config.password)) {
@@ -9,13 +9,13 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const keysToDelete = await request.json();
+    const keysToDelete = await request.json() as string[];
     if (!Array.isArray(keysToDelete) || keysToDelete.length === 0) {
       return jsonResponse({ message: '没有要删除的项' }, 400);
     }
 
     const placeholders = keysToDelete.map(() => '?').join(',');
-    const cache = caches.default;
+    const cache = (caches as any).default as Cache;
 
     const [dbResult] = await Promise.all([
       config.database.prepare(
@@ -27,12 +27,12 @@ export async function onRequestPost(context) {
       }))
     ]);
 
-    if (dbResult.changes === 0) {
+    if (dbResult.meta.changes === 0) {
       return jsonResponse({ message: '未找到要删除的项' }, 404);
     }
 
     return jsonResponse({ message: '删除成功' });
-  } catch (error) {
+  } catch (error: any) {
     return jsonResponse({ error: '删除失败', details: error.message }, 500);
   }
 }

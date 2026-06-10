@@ -1,7 +1,7 @@
-import { getFileExtension, CONTENT_TYPE_MAP, extractConfig, CACHE_CONFIG, getContentType } from './_utils.js';
+import { getFileExtension, CONTENT_TYPE_MAP, extractConfig, CACHE_CONFIG, getContentType } from '../utils';
+import type { Env } from '../utils';
 
-export async function onRequest(context) {
-  const { request, env, next } = context;
+export async function handleImage(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const pathname = url.pathname;
 
@@ -10,9 +10,9 @@ export async function onRequest(context) {
   if (CONTENT_TYPE_MAP[extension]) {
     const config = extractConfig(env);
 
-    // We only process it if it's an image. Otherwise, fallback to next()
+    // We only process it if it's an image. Otherwise, fallback to env.ASSETS.fetch
     const requestedUrl = url.origin + pathname;
-    const cache = caches.default;
+    const cache = (caches as any).default as Cache;
 
     // ⚡ 核心改动 1：构造一个带有缓存行为的请求对象
     const cacheKey = new Request(requestedUrl, {
@@ -31,7 +31,7 @@ export async function onRequest(context) {
       ).bind(requestedUrl).first();
 
       if (!result) {
-        return await next(); // Fallback to React static assets instead of immediately failing.
+        return env.ASSETS.fetch(request); // Fallback to React static assets instead of immediately failing.
       }
 
       const fileId = result.fileId;
@@ -41,7 +41,7 @@ export async function onRequest(context) {
           `https://api.telegram.org/bot${config.tgBotToken}/getFile?file_id=${fileId}`
         );
         if (getFilePath.ok) {
-          const fileData = await getFilePath.json();
+          const fileData = await getFilePath.json() as any;
           if (fileData.ok && fileData.result.file_path) {
             filePath = fileData.result.file_path;
             break;
@@ -83,10 +83,10 @@ export async function onRequest(context) {
       return responseToCache;
     } catch (e) {
       console.error("Error serving image:", e);
-      return await next();
+      return env.ASSETS.fetch(request);
     }
   }
 
   // Not an image or no extension match, pass to ASSETS (the React app)
-  return next();
+  return env.ASSETS.fetch(request);
 }

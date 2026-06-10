@@ -1,12 +1,12 @@
-import { CACHE_CONFIG } from '../_utils.js';
+import { CACHE_CONFIG } from '../utils';
+import type { Env } from '../utils';
 
-export async function onRequestGet(context) {
-  const cache = caches.default;
+export async function handleBing(_request: Request, _env: Env): Promise<Response> {
+  const cache = (caches as any).default as Cache;
   const cacheKey = new Request('https://cn.bing.com/HPImageArchive.aspx?format=js&idx=0&n=5');
 
   const cachedResponse = await cache.match(cacheKey);
   if (cachedResponse) {
-    // Clone it before returning so the cached response can be used again
     const cloned = cachedResponse.clone();
     return new Response(cloned.body, {
       status: cloned.status,
@@ -23,8 +23,8 @@ export async function onRequestGet(context) {
       });
     }
 
-    const bingData = await res.json();
-    const images = bingData.images.map(image => ({
+    const bingData = await res.json() as any;
+    const images = bingData.images.map((image: any) => ({
       url: `https://cn.bing.com${image.url}`
     }));
 
@@ -45,7 +45,7 @@ export async function onRequestGet(context) {
 
     await cache.put(cacheKey, response.clone());
     return response;
-  } catch (error) {
+  } catch (error: any) {
     return new Response(JSON.stringify({ error: '请求 Bing API 失败', details: error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

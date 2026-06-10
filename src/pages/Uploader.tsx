@@ -3,6 +3,12 @@ import { uploadFile } from '../services/api';
 import type { CachedUpload } from '../types';
 import { Clock, Info, Link as LinkIcon, Code, Type, Trash2, Minimize2, Maximize2, UploadCloud } from 'lucide-react';
 
+export interface UploaderProps {
+  adminMode?: boolean;
+  token?: string;
+  onUploadSuccess?: (url: string) => void;
+}
+
 const calculateHash = async (file: File) => {
   const chunkSize = 1024 * 1024;
   const chunk = file.size > chunkSize ? file.slice(0, chunkSize) : file;
@@ -41,7 +47,7 @@ const compressImage = async (file: File, quality = 0.75): Promise<File> => {
   });
 };
 
-const UploaderPage: React.FC = () => {
+const UploaderPage: React.FC<UploaderProps> = ({ adminMode, token, onUploadSuccess }) => {
   const [urls, setUrls] = useState<string[]>([]);
   const [thumbnails, setThumbnails] = useState<{ url: string, preview: string, type: string }[]>([]);
   const [progress, setProgress] = useState<{ [key: string]: number }>({});
@@ -59,7 +65,7 @@ const UploaderPage: React.FC = () => {
       const fileHash = await calculateHash(file);
       const existingCache = cache.find(c => c.hash === fileHash);
 
-      if (existingCache) {
+      if (existingCache && !adminMode) {
         if (!urls.includes(existingCache.url)) {
           setUrls(prev => [...prev, existingCache.url]);
         }
@@ -77,24 +83,30 @@ const UploaderPage: React.FC = () => {
 
         const res = await uploadFile(uploadableFile, (p) => {
           setProgress(prev => ({ ...prev, [tempId]: p }));
-        });
+        }, adminMode, token);
 
         if (res.data) {
           const newUrl = res.data;
           setUrls(prev => [...prev, newUrl]);
 
-          const preview = URL.createObjectURL(file);
-          setThumbnails(prev => [...prev, { url: newUrl, preview, type: file.type }]);
+          if (onUploadSuccess) {
+            onUploadSuccess(newUrl);
+          }
 
-          const newCacheItem: CachedUpload = {
-            url: newUrl,
-            fileName: file.name,
-            hash: fileHash,
-            timestamp: new Date().toLocaleString('zh-CN', { hour12: false })
-          };
-          const newCache = [...cache, newCacheItem];
-          setCache(newCache);
-          localStorage.setItem('uploadCache', JSON.stringify(newCache));
+          if (!adminMode) {
+            const preview = URL.createObjectURL(file);
+            setThumbnails(prev => [...prev, { url: newUrl, preview, type: file.type }]);
+
+            const newCacheItem: CachedUpload = {
+              url: newUrl,
+              fileName: file.name,
+              hash: fileHash,
+              timestamp: new Date().toLocaleString('zh-CN', { hour12: false })
+            };
+            const newCache = [...cache, newCacheItem];
+            setCache(newCache);
+            localStorage.setItem('uploadCache', JSON.stringify(newCache));
+          }
         } else if (res.error) {
           alert(`上传失败: ${res.error}`);
         }

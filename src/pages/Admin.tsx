@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
-import { getAdminMedia, deleteAdminMedia } from '../services/api';
-import type { MediaItem } from '../types';
-import { Copy, Trash2, CheckSquare, FolderArchive } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { getAdminMedia, deleteAdminMedia, getTags, createTag, deleteTag, batchTagMedia, triggerBingCrawl } from '../services/api';
+import type { MediaItem, Tag } from '../types';
+import Sidebar from '../components/admin/Sidebar';
+import TagModal from '../components/admin/TagModal';
+import Toolbar from '../components/admin/Toolbar';
+import MediaGrid from '../components/admin/MediaGrid';
+import BatchBar from '../components/admin/BatchBar';
 
 const AdminPage: React.FC = () => {
   const [token, setToken] = useState<string>('');
@@ -14,6 +18,16 @@ const AdminPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+
+  // New states for phase 3
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [activeTagId, setActiveTagId] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [isTagModalOpen, setIsTagModalOpen] = useState(false);
+  const [isSubmittingTag, setIsSubmittingTag] = useState(false);
+  const [isDeletingTag, setIsDeletingTag] = useState<number | null>(null);
+  const [isCrawlingBing, setIsCrawlingBing] = useState(false);
 
   const authenticate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,14 +52,31 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  const loadPage = async (newPage: number) => {
+  const fetchTags = async () => {
+    try {
+      const res = await getTags();
+      if (res.data) setTags(res.data);
+    } catch (e) {
+      console.error('Failed to load tags', e);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      fetchTags();
+      loadPage(1, activeTagId);
+    }
+  }, [isAuthenticated, token, activeTagId]);
+
+  const loadPage = async (newPage: number, tagId: number | null = activeTagId) => {
     setIsLoading(true);
     try {
-      const res = await getAdminMedia(newPage, token);
+      const res = await getAdminMedia(newPage, token, tagId);
       if (res.data) {
         setMedia(res.data);
         setPage(res.pagination.page);
         setTotalPages(res.pagination.totalPages);
+        setTotalCount(res.pagination.totalCount);
       }
     } catch {
       alert('加载失败');
@@ -64,11 +95,58 @@ const AdminPage: React.FC = () => {
     setSelectedKeys(newSelected);
   };
 
-  const toggleSelectAll = () => {
-    if (selectedKeys.size === media.length) {
+  const handleCreateTag = async (name: string, color: string) => {
+    setIsSubmittingTag(true);
+    try {
+      await createTag(name, color, token);
+      await fetchTags();
+      setIsTagModalOpen(false);
+    } catch (e: any) {
+      alert(`创建失败: ${e.response?.data?.error || e.message}`);
+    } finally {
+      setIsSubmittingTag(false);
+    }
+  };
+
+  const handleDeleteTag = async (id: number) => {
+    if (!confirm('确定删除该标签吗？打上此标签的媒体不会被删除。')) return;
+    setIsDeletingTag(id);
+    try {
+      await deleteTag(id, token);
+      if (activeTagId === id) setActiveTagId(null);
+      await fetchTags();
+      await loadPage(page, activeTagId === id ? null : activeTagId);
+    } catch (e: any) {
+      alert(`删除失败: ${e.message}`);
+    } finally {
+      setIsDeletingTag(null);
+    }
+  };
+
+  const handleBatchTag = async (tagId: number | null) => {
+    if (selectedKeys.size === 0) return;
+    try {
+      await batchTagMedia(Array.from(selectedKeys), tagId, token);
+      alert('批量操作成功');
       setSelectedKeys(new Set());
-    } else {
-      setSelectedKeys(new Set(media.map(m => m.url)));
+      fetchTags();
+      loadPage(page);
+    } catch (e: any) {
+      alert(`操作失败: ${e.message}`);
+    }
+  };
+
+  const handleTriggerBingCrawl = async () => {
+    setIsCrawlingBing(true);
+    try {
+      const res = await triggerBingCrawl(token);
+      alert(`抓取完成：成功 ${res.success} 张，跳过 ${res.skipped} 张已存在`);
+      fetchTags();
+      loadPage(1);
+    } catch (e: any) {
+      alert(`抓取失败: ${e.message}`);
+    } finally {
+      setIsCrawlingBing(false);
     }
   };
 
@@ -134,102 +212,79 @@ const AdminPage: React.FC = () => {
     );
   }
 
+  const filteredMedia = media.filter(item =>
+    !searchTerm ||
+    (item.filename && item.filename.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    item.url.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div className="min-h-screen bg-gray-100 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-center text-indigo-700 mb-8">图库管理</h1>
-
-        <div className="bg-white/80 backdrop-blur-md rounded-xl shadow-sm p-4 mb-6 flex flex-wrap justify-between items-center gap-4 sticky top-4 z-10 border border-gray-200">
-          <div className="text-gray-600 font-medium">
-            共 {totalCount} 个文件 | 已选 {selectedKeys.size} 个
-          </div>
-
-          <div className={`flex gap-3 ${selectedKeys.size > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'} transition-opacity`}>
-            <div className="relative group">
-              <button className="flex items-center gap-2 bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition shadow">
-                <Copy size={16} /> 复制
-              </button>
-              <div className="absolute right-0 top-full mt-2 bg-white rounded-lg shadow-xl border overflow-hidden hidden group-hover:block w-32">
-                <button onClick={() => handleCopy('url')} className="w-full text-left px-4 py-2 hover:bg-indigo-50 text-sm">URL</button>
-                <button onClick={() => handleCopy('bbcode')} className="w-full text-left px-4 py-2 hover:bg-indigo-50 text-sm">BBCode</button>
-                <button onClick={() => handleCopy('markdown')} className="w-full text-left px-4 py-2 hover:bg-indigo-50 text-sm">Markdown</button>
-              </div>
-            </div>
-
-            <button onClick={toggleSelectAll} className="flex items-center gap-2 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition">
-              <CheckSquare size={16} /> 全选
-            </button>
-            <button onClick={handleDelete} className="flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition shadow">
-              <Trash2 size={16} /> 删除
-            </button>
-          </div>
+    <div className="h-screen flex flex-col bg-slate-50 overflow-hidden font-sans">
+      <header className="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center shrink-0">
+        <div className="flex items-center space-x-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-600"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+          <h1 className="text-xl font-bold text-slate-800 tracking-tight">Telegraph 图床后台</h1>
         </div>
+        <button
+          onClick={() => setIsAuthenticated(false)}
+          className="text-sm text-slate-500 hover:text-slate-800 transition-colors"
+        >
+          退出登录
+        </button>
+      </header>
 
-        {media.length === 0 ? (
-          <div className="text-center py-20 text-gray-400 bg-white rounded-xl shadow-sm">
-            <FolderArchive size={48} className="mx-auto mb-4 opacity-50" />
-            <p>暂无媒体文件</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {media.map((item) => {
-              const isSelected = selectedKeys.has(item.url);
-              const ext = item.url.split('.').pop()?.toLowerCase() || '';
-              const isVideo = ['mp4', 'webm', 'mov'].includes(ext);
-              const timestampMatch = item.url.match(/\/(\d+)\./);
-              const timestamp = timestampMatch ? new Date(parseInt(timestampMatch[1])).toLocaleString() : '';
+      <div className="flex-1 flex overflow-hidden">
+        <Sidebar
+          tags={tags}
+          activeTagId={activeTagId}
+          onSelectTag={(id) => { setActiveTagId(id); setSelectedKeys(new Set()); }}
+          onNewTag={() => setIsTagModalOpen(true)}
+          onDeleteTag={handleDeleteTag}
+          isDeletingTag={isDeletingTag}
+          totalCount={tags.reduce((acc, t) => acc + (t.count || 0), 0) + (media.length > 0 && !tags.some(t => t.count) ? totalCount : 0)} // Approximation
+        />
 
-              return (
-                <div
-                  key={item.url}
-                  onClick={() => toggleSelect(item.url)}
-                  className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer bg-white shadow-sm border-2 transition-all ${
-                    isSelected ? 'border-indigo-500 scale-95 shadow-indigo-200' : 'border-transparent hover:shadow-md'
-                  }`}
-                >
-                  <div className="absolute top-2 left-2 z-10 bg-indigo-600 text-white text-xs font-bold px-2 py-1 rounded-full uppercase">
-                    {ext}
-                  </div>
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <Toolbar
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            viewMode={viewMode}
+            setViewMode={setViewMode}
+            onUploadSuccess={() => { fetchTags(); loadPage(1); }}
+            token={token}
+            activeTag={tags.find(t => t.id === activeTagId)}
+            onTriggerBingCrawl={handleTriggerBingCrawl}
+            isCrawlingBing={isCrawlingBing}
+          />
 
-                  {isVideo ? (
-                    <video src={item.url} className="w-full h-full object-cover" />
-                  ) : (
-                    <img src={item.url} loading="lazy" className="w-full h-full object-cover" alt="" />
-                  )}
-
-                  {isSelected && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur p-2 text-xs text-center text-gray-600">
-                      {timestamp}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-4 mt-8 bg-white/60 backdrop-blur p-4 rounded-xl shadow-sm">
-            <button
-              disabled={page <= 1}
-              onClick={() => loadPage(page - 1)}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg disabled:opacity-50 disabled:bg-gray-400"
-            >
-              上一页
-            </button>
-            <span className="font-medium text-gray-600">
-              {page} / {totalPages}
-            </span>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => loadPage(page + 1)}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg disabled:opacity-50 disabled:bg-gray-400"
-            >
-              下一页
-            </button>
-          </div>
-        )}
+          <MediaGrid
+            media={filteredMedia}
+            selectedUrls={selectedKeys}
+            toggleSelect={toggleSelect}
+            viewMode={viewMode}
+            isLoading={isLoading}
+            page={page}
+            totalPages={totalPages}
+            setPage={(p) => loadPage(p)}
+          />
+        </div>
       </div>
+
+      <BatchBar
+        selectedCount={selectedKeys.size}
+        onClearSelect={() => setSelectedKeys(new Set())}
+        onDelete={handleDelete}
+        onBatchTag={handleBatchTag}
+        onCopyLinks={handleCopy}
+        tags={tags}
+      />
+
+      <TagModal
+        isOpen={isTagModalOpen}
+        onClose={() => setIsTagModalOpen(false)}
+        onSubmit={handleCreateTag}
+        isSubmitting={isSubmittingTag}
+      />
     </div>
   );
 };

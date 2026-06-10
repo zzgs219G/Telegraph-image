@@ -1,12 +1,12 @@
-import { extractConfig, authenticate, unauthorizedResponse, jsonResponse, CONTENT_TYPE_MAP, getFileExtension } from '../_utils.js';
+import { extractConfig, authenticate, unauthorizedResponse, jsonResponse, getFileExtension } from '../utils';
+import type { Env } from '../utils';
 
-export async function onRequestPost(context) {
-  const { request, env } = context;
+export async function handleUpload(request: Request, env: Env): Promise<Response> {
   const config = extractConfig(env);
 
   try {
     const formData = await request.formData();
-    const file = formData.get('file');
+    const file = formData.get('file') as File | null;
 
     if (!file) throw new Error('缺少文件');
 
@@ -35,11 +35,11 @@ export async function onRequestPost(context) {
     );
 
     if (!telegramResponse.ok) {
-      const errorData = await telegramResponse.json();
+      const errorData = await telegramResponse.json() as any;
       throw new Error(errorData.description || '上传到 Telegram 失败');
     }
 
-    const responseData = await telegramResponse.json();
+    const responseData = await telegramResponse.json() as any;
     const fileId = responseData.result.video?.file_id
       || responseData.result.document?.file_id
       || responseData.result.sticker?.file_id;
@@ -48,15 +48,17 @@ export async function onRequestPost(context) {
 
     const fileExtension = getFileExtension(file.name);
     const timestamp = Date.now();
-    const isImage = CONTENT_TYPE_MAP[fileExtension]?.startsWith('image/');
     const imageURL = `https://${config.domain}/${timestamp}.${fileExtension}`;
 
+    const tagResult = await config.database.prepare('SELECT id FROM tags WHERE name = ?').bind('前台上传').first();
+    const tagId = tagResult?.id || null;
+
     await config.database.prepare(
-      'INSERT INTO media (url, fileId) VALUES (?, ?) ON CONFLICT(url) DO NOTHING'
-    ).bind(imageURL, fileId).run();
+      'INSERT INTO media (url, fileId, tag_id, filename, size) VALUES (?, ?, ?, ?, ?) ON CONFLICT(url) DO NOTHING'
+    ).bind(imageURL, fileId, tagId, file.name, file.size).run();
 
     return jsonResponse({ data: imageURL });
-  } catch (error) {
+  } catch (error: any) {
     console.error('内部服务器错误:', error);
     return jsonResponse({ error: error.message }, 500);
   }

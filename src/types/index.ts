@@ -1,6 +1,18 @@
+export interface Tag {
+  id: number;
+  name: string;
+  color: string;
+  count?: number;
+}
+
 export interface MediaItem {
   url: string;
   fileId: string;
+  tag_id?: number;
+  filename?: string;
+  size?: number;
+  created_at?: number;
+  tag?: Tag;
 }
 
 export interface Pagination {
