@@ -1,4 +1,4 @@
-name = 'tg-image'
+name = "tg-image"
 main = "src/worker/index.ts"
 compatibility_date = "2026-06-10"
 compatibility_flags = ["nodejs_compat"]
