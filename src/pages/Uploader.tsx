@@ -10,6 +10,7 @@ export interface UploaderProps {
   onUploadSuccess?: (url: string) => void;
 }
 
+
 const calculateHash = async (file: File) => {
   if (!window.crypto || !window.crypto.subtle) {
     return `fallback-${file.name}-${file.size}-${file.lastModified}`;
