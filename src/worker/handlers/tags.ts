@@ -10,14 +10,13 @@ export async function handleTags(request: Request, env: Env): Promise<Response> 
   const method = request.method.toUpperCase();
   const url = new URL(request.url);
   const path = url.pathname;
-
   const config = extractConfig(env);
 
   // GET /api/tags - No auth required
   if (method === 'GET' && path === '/api/tags') {
     try {
       const result = await config.database.prepare(`
-        SELECT t.id, t.name, t.color, t.created_at, COUNT(m.id) as count
+        SELECT t.id, t.name, t.color, t.created_at, COUNT(m.url) as count
         FROM tags t
         LEFT JOIN media m ON t.id = m.tag_id
         GROUP BY t.id
@@ -39,11 +38,9 @@ export async function handleTags(request: Request, env: Env): Promise<Response> 
     try {
       const { name, color } = await request.json() as any;
       if (!name || !color) return jsonResponse({ error: 'name and color are required' }, 400);
-
       const result = await config.database.prepare(
         'INSERT INTO tags (name, color) VALUES (?, ?) RETURNING *'
       ).bind(name, color).first();
-
       return jsonResponse({ data: result });
     } catch (e: any) {
       return jsonResponse({ error: '创建标签失败', details: e.message }, 500);
@@ -71,16 +68,13 @@ export async function handleTags(request: Request, env: Env): Promise<Response> 
       try {
         const { name, color } = await request.json() as any;
         if (!name && !color) return jsonResponse({ error: 'name or color required' }, 400);
-
         const updates: string[] = [];
         const values: any[] = [];
         if (name) { updates.push('name = ?'); values.push(name); }
         if (color) { updates.push('color = ?'); values.push(color); }
         values.push(id);
-
         const query = `UPDATE tags SET ${updates.join(', ')} WHERE id = ?`;
         await config.database.prepare(query).bind(...values).run();
-
         return jsonResponse({ message: '更新成功' });
       } catch (e: any) {
         return jsonResponse({ error: '更新标签失败', details: e.message }, 500);
