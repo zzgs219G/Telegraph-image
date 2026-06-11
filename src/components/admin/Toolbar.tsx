@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import type { Tag } from './Sidebar';
+import type { Tag } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 

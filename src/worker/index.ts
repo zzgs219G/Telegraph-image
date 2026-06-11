@@ -25,7 +25,7 @@ const routes: Route[] = [
   { method: 'PATCH', path: '/api/media/batch-tag',    handler: handleBatchTag },
   { method: 'GET',   path: '/api/wallpaper/random',   handler: handleWallpaper },
   { method: 'GET',   path: '/api/bing',               handler: handleWallpaper }, // Alias
-  { method: 'POST',  path: '/api/cron/bing',          handler: (req, env) => crawlBingWallpapers(env, true) as Promise<Response> },
+  { method: 'POST',  path: '/api/cron/bing',          handler: (_req, env) => crawlBingWallpapers(env, true) as Promise<Response> },
   { method: 'GET',   path: '/api/tags',               handler: handleTags },
   { method: 'POST',  path: '/api/tags',               handler: handleTags },
   { method: 'DELETE',path: /^\/api\/tags\/\d+$/,      handler: handleTags },
