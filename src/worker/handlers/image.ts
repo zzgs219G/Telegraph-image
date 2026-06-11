@@ -24,16 +24,13 @@ export async function handleImage(request: Request, env: Env): Promise<Response>
     const fullUrl = `https://${config.domain}${pathname}`;
 
     // ⚡ 核心改动 1：构造纯 URL cache key，而 match 时加上 cf 对象
-    const cacheKey = new Request(fullUrl);
-    const matchKey = new Request(fullUrl, {
-      cf: {
-        cacheEverything: true,
-        cacheTtl: CACHE_CONFIG.IMAGE
-      }
-    });
+    // ✨ 绿色环保、绝不串线的标准写法
+const cacheKey = new Request(fullUrl);
+// 直接用纯粹的 cacheKey 去匹配，不要夹带任何 cf 对象的私货
+const cachedResponse = await cache.match(cacheKey);
 
-    const cachedResponse = await cache.match(matchKey);
-    if (cachedResponse) return cachedResponse;
+if (cachedResponse) return cachedResponse;
+
 
     try {
       // 从 D1 查询图片绑定的 Telegram 文件 ID
