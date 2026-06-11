@@ -26,7 +26,18 @@ export async function handleImage(request: Request, env: Env): Promise<Response>
     // 1. 从缓存中匹配
     const cacheKey = new Request(fullUrl);
     const cachedResponse = await cache.match(cacheKey);
-    if (cachedResponse) return cachedResponse;
+    if (cachedResponse) {
+      // ✅ 【Bug修复】：校验缓存内容的 Content-Type。
+      // 修复前 env.ASSETS 回退返回的 index.html 可能已被缓存进来，
+      // 此处将 text/html 的脏缓存识别出来并主动清除，强制重新走 D1 查询。
+      const cachedContentType = cachedResponse.headers.get('Content-Type') || '';
+      if (cachedContentType.includes('text/html')) {
+        await cache.delete(cacheKey);
+        // 不 return，继续向下走 D1 查询逻辑
+      } else {
+        return cachedResponse;
+      }
+    }
 
     try {
       // 从 D1 查询图片绑定的 Telegram 文件 ID
