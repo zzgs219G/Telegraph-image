@@ -1,4 +1,4 @@
-import { getFileExtension, CONTENT_TYPE_MAP, extractConfig, CACHE_CONFIG, getContentType } from '../utils';
+import { getFileExtension, CONTENT_TYPE_MAP, extractConfig, getContentType } from '../utils';
 import type { Env } from '../utils';
 
 /**
@@ -23,7 +23,6 @@ export async function handleImage(request: Request, env: Env): Promise<Response>
     const cache = (caches as any).default as Cache;
     const fullUrl = `https://${config.domain}${pathname}`;
 
-    // ⚡ 核心改动 1：构造纯 URL cache key，而 match 时加上 cf 对象
     // ✨ 绿色环保、绝不串线的标准写法
 const cacheKey = new Request(fullUrl);
 // 直接用纯粹的 cacheKey 去匹配，不要夹带任何 cf 对象的私货
