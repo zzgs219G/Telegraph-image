@@ -37,11 +37,19 @@ const compressImage = async (file: File, quality = 0.75): Promise<File> => {
         }
       }, 'image/jpeg', quality);
     };
+    image.onerror = () => {
+      resolve(file);
+    };
     const reader = new FileReader();
     reader.onload = (event) => {
       if (event.target?.result) {
         image.src = event.target.result as string;
+      } else {
+        resolve(file);
       }
+    };
+    reader.onerror = () => {
+      resolve(file);
     };
     reader.readAsDataURL(file);
   });

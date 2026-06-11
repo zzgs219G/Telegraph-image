@@ -89,8 +89,16 @@ export async function handleTags(request: Request, env: Env): Promise<Response> 
       const { urls, tag_id } = await request.json() as any;
       if (!Array.isArray(urls) || urls.length === 0) return jsonResponse({ error: 'urls array required' }, 400);
 
-      const placeholders = urls.map(() => '?').join(',');
-      const bindValues = [tag_id === null ? null : tag_id, ...urls];
+      const paths = urls.map(url => {
+        try {
+          return new URL(url).pathname;
+        } catch {
+          return url;
+        }
+      });
+
+      const placeholders = paths.map(() => '?').join(',');
+      const bindValues = [tag_id === null ? null : tag_id, ...paths];
       const query = `UPDATE media SET tag_id = ? WHERE url IN (${placeholders})`;
 
       const result = await config.database.prepare(query).bind(...bindValues).run();

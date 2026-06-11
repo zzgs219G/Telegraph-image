@@ -9,10 +9,18 @@ export async function handleDelete(request: Request, env: Env): Promise<Response
   }
 
   try {
-    const keysToDelete = await request.json() as string[];
-    if (!Array.isArray(keysToDelete) || keysToDelete.length === 0) {
+    const keysToDeleteUrls = await request.json() as string[];
+    if (!Array.isArray(keysToDeleteUrls) || keysToDeleteUrls.length === 0) {
       return jsonResponse({ message: '没有要删除的项' }, 400);
     }
+
+    const keysToDelete = keysToDeleteUrls.map(url => {
+      try {
+        return new URL(url).pathname;
+      } catch {
+        return url;
+      }
+    });
 
     const placeholders = keysToDelete.map(() => '?').join(',');
     const cache = (caches as any).default as Cache;
@@ -21,7 +29,7 @@ export async function handleDelete(request: Request, env: Env): Promise<Response
       config.database.prepare(
         `DELETE FROM media WHERE url IN (${placeholders})`
       ).bind(...keysToDelete).run(),
-      Promise.all(keysToDelete.map(async (url) => {
+      Promise.all(keysToDeleteUrls.map(async (url) => {
         const cacheKey = new Request(url);
         await cache.delete(cacheKey);
       }))
