@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { uploadFile } from '../services/api';
 import type { CachedUpload } from '../types';
-import { Clock, Info, Link as LinkIcon, Code, Type, Trash2, Minimize2, Maximize2, UploadCloud } from 'lucide-react';
+import { Clock, Link as LinkIcon, Code, Type, Trash2, Minimize2, Maximize2, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 
 export interface UploaderProps {
