@@ -4,12 +4,6 @@ import type { CachedUpload } from '../types';
 import { Clock, Info, Link as LinkIcon, Code, Type, Trash2, Minimize2, Maximize2, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 
-/**
- * UploaderProps 定义了上传组件可能接收的参数
- * @property {boolean} adminMode - 是否为后台上传模式
- * @property {string} token - 后台上传认证 token
- * @property {function} onUploadSuccess - 上传成功回调（用于后台刷新列表）
- */
 export interface UploaderProps {
   adminMode?: boolean;
   token?: string;
@@ -17,6 +11,9 @@ export interface UploaderProps {
 }
 
 const calculateHash = async (file: File) => {
+  if (!window.crypto || !window.crypto.subtle) {
+    return `fallback-${file.name}-${file.size}-${file.lastModified}`;
+  }
   const chunkSize = 1024 * 1024;
   const chunk = file.size > chunkSize ? file.slice(0, chunkSize) : file;
   const arrayBuffer = await chunk.arrayBuffer();
@@ -71,39 +68,31 @@ const UploaderPage: React.FC<UploaderProps> = ({ adminMode, token, onUploadSucce
     for (const file of files) {
       const fileHash = await calculateHash(file);
       const existingCache = cache.find(c => c.hash === fileHash);
-
       if (existingCache && !adminMode) {
         if (!urls.includes(existingCache.url)) {
           setUrls(prev => [...prev, existingCache.url]);
         }
         continue;
       }
-
       const tempId = Math.random().toString(36).substring(7);
       setProgress(prev => ({ ...prev, [tempId]: 0 }));
-
       try {
         let uploadableFile = file;
         if (file.type.startsWith('image/') && file.type !== 'image/gif' && isCompressing) {
           uploadableFile = await compressImage(file);
         }
-
         const res = await uploadFile(uploadableFile, (p) => {
           setProgress(prev => ({ ...prev, [tempId]: p }));
         }, adminMode, token);
-
         if (res.data) {
           const newUrl = res.data;
           setUrls(prev => [...prev, newUrl]);
-
           if (onUploadSuccess) {
             onUploadSuccess(newUrl);
           }
-
           if (!adminMode) {
             const preview = URL.createObjectURL(file);
             setThumbnails(prev => [...prev, { url: newUrl, preview, type: file.type }]);
-
             const newCacheItem: CachedUpload = {
               url: newUrl,
               fileName: file.name,
@@ -143,8 +132,7 @@ const UploaderPage: React.FC<UploaderProps> = ({ adminMode, token, onUploadSucce
     };
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCompressing, cache, urls]); // Include cache and urls to use the latest state inside handleFiles
+  }, [isCompressing, cache, urls]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -166,12 +154,10 @@ const UploaderPage: React.FC<UploaderProps> = ({ adminMode, token, onUploadSucce
 
   const handleCopy = (format: 'url' | 'bbcode' | 'markdown') => {
     if (urls.length === 0) return;
-
     let text = '';
-    if (format === 'url') text = urls.join('\\n\\n');
-    else if (format === 'bbcode') text = urls.map(u => `[img]${u}[/img]`).join('\\n\\n');
-    else if (format === 'markdown') text = urls.map(u => `![image](${u})`).join('\\n\\n');
-
+    if (format === 'url') text = urls.join('\n\n');
+    else if (format === 'bbcode') text = urls.map(u => `[img]${u}[/img]`).join('\n\n');
+    else if (format === 'markdown') text = urls.map(u => `![image](${u})`).join('\n\n');
     navigator.clipboard.writeText(text).then(() => {
       toast.success('复制成功');
     }).catch(() => {
@@ -189,56 +175,73 @@ const UploaderPage: React.FC<UploaderProps> = ({ adminMode, token, onUploadSucce
   const activeProgress = Object.values(progress);
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-4">
-      <div className="relative bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl p-8 w-full max-w-lg mx-auto">
-
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent truncate pr-4">
-            Telegraph图床
-          </h1>
-          <div className="flex gap-2 shrink-0">
+    <div className="flex items-center justify-center min-h-screen p-6 font-sans">
+      <div className="relative bg-slate-900/40 backdrop-blur-2xl rounded-3xl shadow-[0_32px_64px_rgba(0,0,0,0.2)] border border-white/10 p-8 w-full max-w-xl mx-auto transition-all duration-300">
+        
+        {/* Header Section */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-white">
+              Telegraph <span className="text-slate-400 font-light">Cloud</span>
+            </h1>
+            <p className="text-xs text-slate-400/80 mt-1">简单、纯粹的轻量级图床系统</p>
+          </div>
+          <div className="flex gap-1 bg-white/5 p-1 rounded-xl border border-white/5">
             <button
               onClick={() => setIsCompressing(!isCompressing)}
-              className="p-2 text-indigo-400 hover:text-indigo-600 transition-colors"
-              title={isCompressing ? "关闭压缩" : "开启压缩"}
+              className={`p-2 rounded-lg transition-all duration-200 ${isCompressing ? 'bg-white/10 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+              title={isCompressing ? "已开启智能压缩" : "未开启压缩"}
             >
-              {isCompressing ? <Minimize2 size={24} /> : <Maximize2 size={24} />}
+              {isCompressing ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
             </button>
             <button
               onClick={() => setShowCache(!showCache)}
-              className="p-2 text-indigo-400 hover:text-indigo-600 transition-colors"
-              title="查看历史记录"
+              className={`p-2 rounded-lg transition-all duration-200 ${showCache ? 'bg-white/10 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+              title="上传历史记录"
             >
-              <Clock size={24} />
+              <Clock size={18} />
             </button>
           </div>
         </div>
 
         {showCache ? (
-          <div className="max-h-64 overflow-y-auto space-y-2 pr-2">
-            {cache.length === 0 ? (
-              <p className="text-center text-gray-500 py-4">还没有记录哦！</p>
-            ) : (
-              [...cache].reverse().map((item, idx) => (
-                <div
-                  key={idx}
-                  className="bg-white p-3 rounded-lg shadow-sm border border-indigo-50 cursor-pointer hover:bg-indigo-50/50 hover:border-indigo-200 transition-all text-sm text-left"
-                  onClick={() => {
-                    setUrls([item.url]);
-                    setShowCache(false);
-                  }}
-                >
-                  <div className="text-xs text-gray-400 mb-1">{item.timestamp}</div>
-                  <div className="font-medium text-gray-700 truncate">{item.fileName}</div>
-                </div>
-              ))
-            )}
+          /* History View */
+          <div className="space-y-2">
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-xs font-medium text-slate-400">历史记录 ({cache.length})</span>
+              <button onClick={() => setShowCache(false)} className="text-xs text-white/60 hover:text-white transition-colors">返回上传</button>
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+              {cache.length === 0 ? (
+                <p className="text-center text-sm text-slate-500 py-8">暂无历史上传记录</p>
+              ) : (
+                [...cache].reverse().map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-3 cursor-pointer transition-all text-left group"
+                    onClick={() => {
+                      setUrls([item.url]);
+                      setShowCache(false);
+                    }}
+                  >
+                    <div className="flex justify-between items-center mb-1">
+                      <div className="font-medium text-sm text-slate-200 truncate max-w-[70%]">{item.fileName}</div>
+                      <div className="text-[10px] text-slate-500 font-mono">{item.timestamp}</div>
+                    </div>
+                    <div className="text-xs text-slate-400 truncate font-mono group-hover:text-slate-300">{item.url}</div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         ) : (
+          /* Main Upload View */
           <>
             <div
-              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
-                isDragging ? 'border-purple-500 bg-purple-50' : 'border-indigo-300 bg-indigo-50/50 hover:border-purple-400 hover:bg-indigo-50'
+              className={`border border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all duration-300 group relative overflow-hidden ${
+                isDragging 
+                  ? 'border-white bg-white/10 scale-[0.99]' 
+                  : 'border-white/20 bg-white/5 hover:border-white/40 hover:bg-white/8'
               }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -255,41 +258,45 @@ const UploaderPage: React.FC<UploaderProps> = ({ adminMode, token, onUploadSucce
                   e.target.value = '';
                 }}
               />
-              <UploadCloud className="mx-auto text-indigo-500 mb-3" size={48} />
-              <p className="text-indigo-600 font-medium">点击选择文件，或将文件拖拽到此处</p>
+              <div className="relative z-10">
+                <UploadCloud className="mx-auto text-slate-400 group-hover:text-white transition-colors mb-4 duration-300" size={40} />
+                <p className="text-sm font-medium text-slate-200">将文件拖拽至此处，或 <span className="text-white underline underline-offset-4 decoration-white/30 hover:decoration-white">点击浏览</span></p>
+                <p className="text-xs text-slate-400/60 mt-2">支持多文件上传，可在页面任意位置直接 Ctrl+V 粘贴</p>
+              </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-center text-sm text-gray-500">
-              <Info size={16} className="mr-1 text-indigo-500" />
-              <span>支持拖拽上传 · 多文件上传 · Ctrl+V 粘贴上传</span>
-            </div>
-
+            {/* Progress Bars */}
             {activeProgress.length > 0 && (
-              <div className="mt-4 text-center">
+              <div className="mt-4 space-y-2 bg-white/5 rounded-xl p-3 border border-white/5">
                 {activeProgress.map((p, i) => (
-                  <div key={i} className="text-sm font-medium text-indigo-600 mb-1">
-                    上传中... {p}%
+                  <div key={i} className="space-y-1">
+                    <div className="flex justify-between text-xs text-slate-300 font-mono">
+                      <span>正在上传资源...</span>
+                      <span>{p}%</span>
+                    </div>
+                    <div className="w-full bg-white/10 h-1 rounded-full overflow-hidden">
+                      <div className="bg-white h-full transition-all duration-300" style={{ width: `${p}%` }} />
+                    </div>
                   </div>
                 ))}
               </div>
             )}
 
+            {/* Thumbnails */}
             {thumbnails.length > 0 && (
               <div className="flex flex-wrap gap-3 mt-6 justify-center">
                 {thumbnails.map((t, idx) => (
-                  <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden shadow-md group">
+                  <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden shadow-lg group border border-white/10 bg-slate-950">
                     {t.type.startsWith('image/') ? (
-                      <img src={t.preview} className="w-full h-full object-cover" alt="thumbnail" />
+                      <img src={t.preview} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" alt="preview" />
                     ) : t.type.startsWith('video/') ? (
                       <video src={t.preview} className="w-full h-full object-cover" muted />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold text-xs">
-                        FILE
-                      </div>
+                      <div className="w-full h-full flex items-center justify-center text-slate-400 font-mono text-xs font-semibold">FILE</div>
                     )}
                     <button
                       onClick={(e) => { e.stopPropagation(); removeThumbnail(idx); }}
-                      className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-1 right-1 bg-black/70 text-white rounded-lg p-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 duration-200"
                     >
                       <Trash2 size={12} />
                     </button>
@@ -298,31 +305,33 @@ const UploaderPage: React.FC<UploaderProps> = ({ adminMode, token, onUploadSucce
               </div>
             )}
 
+            {/* Result Showcase */}
             {urls.length > 0 && (
-              <div className="mt-6 space-y-4">
-                <div className="flex gap-2 justify-center">
-                  <button onClick={() => handleCopy('url')} className="flex-1 flex items-center justify-center gap-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-2 rounded-lg font-medium transition-colors text-sm">
-                    <LinkIcon size={16} /> URL
+              <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="grid grid-cols-3 gap-2">
+                  <button onClick={() => handleCopy('url')} className="flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/20 text-white py-2 rounded-xl text-xs font-medium transition-all">
+                    <LinkIcon size={14} /> URL
                   </button>
-                  <button onClick={() => handleCopy('bbcode')} className="flex-1 flex items-center justify-center gap-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-2 rounded-lg font-medium transition-colors text-sm">
-                    <Code size={16} /> BBCode
+                  <button onClick={() => handleCopy('bbcode')} className="flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/20 text-white py-2 rounded-xl text-xs font-medium transition-all">
+                    <Code size={14} /> BBCode
                   </button>
-                  <button onClick={() => handleCopy('markdown')} className="flex-1 flex items-center justify-center gap-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-2 rounded-lg font-medium transition-colors text-sm">
-                    <Type size={16} /> Markdown
+                  <button onClick={() => handleCopy('markdown')} className="flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/20 text-white py-2 rounded-xl text-xs font-medium transition-all">
+                    <Type size={14} /> Markdown
                   </button>
                 </div>
                 <textarea
                   readOnly
-                  value={urls.join('\\n\\n')}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none h-32"
+                  value={urls.join('\n\n')}
+                  className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-xs font-mono text-slate-300 focus:outline-none focus:border-white/30 resize-none h-28 custom-scrollbar"
                 />
               </div>
             )}
           </>
         )}
 
-        <p className="text-center text-sm text-gray-400 mt-8">
-          项目开源于 GitHub - <a href="https://github.com/0-RTT/telegraph" target="_blank" rel="noreferrer" className="text-indigo-500 hover:underline">0-RTT/telegraph</a>
+        {/* Footer */}
+        <p className="text-center text-[11px] text-slate-500/80 mt-8">
+          Open Source via <a href="https://github.com/0-RTT/telegraph" target="_blank" rel="noreferrer" className="text-slate-400 hover:text-white hover:underline transition-colors">GitHub</a>
         </p>
       </div>
     </div>
