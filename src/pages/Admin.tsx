@@ -185,12 +185,12 @@ const AdminPage: React.FC = () => {
     const res = await deleteAdminMedia(Array.from(selectedKeys), token);
     setIsLoading(false);
 
-    if (res.message) {
+    if (res.message && !res.error) {
       alert('删除成功');
       setSelectedKeys(new Set());
       loadPage(page);
     } else {
-      alert(`删除失败: ${res.error}`);
+      alert(`删除失败: ${res.error || '未知错误'}`);
     }
   };
 

@@ -21,3 +21,14 @@ WHERE url LIKE 'http%';
 SELECT url FROM media LIMIT 5;
 -- Expected output: /1781117167589.jpg (and similar paths)
 ```
+
+## Task 3: Add `source_url` Column to `media`
+
+The background sync task relies on the `source_url` column which was missing from the initial schema. You must apply this migration to avoid SQL errors during wallpaper syncs.
+
+### Migration SQL:
+
+```sql
+ALTER TABLE media ADD COLUMN source_url TEXT;
+CREATE INDEX IF NOT EXISTS idx_media_source_url ON media(source_url);
+```

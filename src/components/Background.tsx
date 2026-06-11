@@ -4,6 +4,7 @@ import { getBingImages } from '../services/api';
 const Background: React.FC = () => {
   const [images, setImages] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     getBingImages().then((res) => {
@@ -12,6 +13,16 @@ const Background: React.FC = () => {
       }
     });
   }, []);
+
+  useEffect(() => {
+    images.forEach(url => {
+      const img = new Image();
+      img.onload = () => setLoadedImages(prev => new Set(prev).add(url));
+      img.src = url;
+    });
+  }, [images]);
+
+  const [displayedIndex, setDisplayedIndex] = useState(0);
 
   useEffect(() => {
     if (images.length === 0) return;
@@ -23,21 +34,32 @@ const Background: React.FC = () => {
     return () => clearInterval(interval);
   }, [images]);
 
+  useEffect(() => {
+    if (images.length > 0 && loadedImages.has(images[currentIndex])) {
+      setDisplayedIndex(currentIndex);
+    }
+  }, [currentIndex, loadedImages, images]);
+
   if (images.length === 0) {
     return <div className="fixed inset-0 bg-gradient-to-br from-indigo-50 to-blue-100 -z-10" />;
   }
 
   return (
     <>
-      {images.map((url, index) => (
-        <div
-          key={url}
-          className={`fixed inset-0 w-full h-full bg-cover bg-center -z-10 transition-opacity duration-1000 ease-in-out ${
-            index === currentIndex ? 'opacity-100' : 'opacity-0'
-          }`}
-          style={{ backgroundImage: `url(${url})` }}
-        />
-      ))}
+      {images.map((url, index) => {
+        const isLoaded = loadedImages.has(url);
+        // Only show the image that is currently the valid displayedIndex
+        const show = index === displayedIndex && isLoaded;
+        return (
+          <div
+            key={url}
+            className={`fixed inset-0 w-full h-full bg-cover bg-center -z-10 transition-opacity duration-1000 ease-in-out ${
+              show ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={isLoaded ? { backgroundImage: `url(${url})` } : {}}
+          />
+        );
+      })}
     </>
   );
 };

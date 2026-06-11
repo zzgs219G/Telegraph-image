@@ -83,22 +83,5 @@ export async function handleTags(request: Request, env: Env): Promise<Response> 
     }
   }
 
-  // PATCH /api/media/batch-tag
-  if (method === 'PATCH' && path === '/api/media/batch-tag') {
-    try {
-      const { urls, tag_id } = await request.json() as any;
-      if (!Array.isArray(urls) || urls.length === 0) return jsonResponse({ error: 'urls array required' }, 400);
-
-      const placeholders = urls.map(() => '?').join(',');
-      const bindValues = [tag_id === null ? null : tag_id, ...urls];
-      const query = `UPDATE media SET tag_id = ? WHERE url IN (${placeholders})`;
-
-      const result = await config.database.prepare(query).bind(...bindValues).run();
-      return jsonResponse({ message: '批量打标签成功', count: result.meta.changes });
-    } catch (e: any) {
-      return jsonResponse({ error: '批量打标签失败', details: e.message }, 500);
-    }
-  }
-
   return new Response('Not found', { status: 404 });
 }

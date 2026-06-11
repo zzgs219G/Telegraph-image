@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Tag } from './Sidebar';
+import type { Tag } from '@/types';
 
 export interface BatchBarProps {
   selectedCount: number;

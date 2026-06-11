@@ -14,15 +14,16 @@ export async function handleImage(request: Request, env: Env): Promise<Response>
     const cache = (caches as any).default as Cache;
     const fullUrl = `https://${config.domain}${pathname}`;
 
-    // ⚡ 核心改动 1：构造一个带有缓存行为的请求对象
-    const cacheKey = new Request(fullUrl, {
+    // ⚡ 核心改动 1：构造纯 URL cache key，而 match 时加上 cf 对象
+    const cacheKey = new Request(fullUrl);
+    const matchKey = new Request(fullUrl, {
       cf: {
         cacheEverything: true,
         cacheTtl: CACHE_CONFIG.IMAGE
       }
     });
 
-    const cachedResponse = await cache.match(cacheKey);
+    const cachedResponse = await cache.match(matchKey);
     if (cachedResponse) return cachedResponse;
 
     try {

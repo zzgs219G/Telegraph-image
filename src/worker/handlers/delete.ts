@@ -14,13 +14,21 @@ export async function handleDelete(request: Request, env: Env): Promise<Response
       return jsonResponse({ message: '没有要删除的项' }, 400);
     }
 
-    const placeholders = keysToDelete.map(() => '?').join(',');
+    const pathsToDelete = keysToDelete.map(url => {
+      try {
+        return new URL(url).pathname;
+      } catch {
+        return url;
+      }
+    });
+
+    const placeholders = pathsToDelete.map(() => '?').join(',');
     const cache = (caches as any).default as Cache;
 
     const [dbResult] = await Promise.all([
       config.database.prepare(
         `DELETE FROM media WHERE url IN (${placeholders})`
-      ).bind(...keysToDelete).run(),
+      ).bind(...pathsToDelete).run(),
       Promise.all(keysToDelete.map(async (url) => {
         const cacheKey = new Request(url);
         await cache.delete(cacheKey);
