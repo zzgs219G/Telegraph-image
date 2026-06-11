@@ -19,47 +19,49 @@ export async function uploadToTelegram(
 ): Promise<{ imagePath: string }> {
   const uploadFormData = new FormData();
   uploadFormData.append("chat_id", config.tgChatId);
-
   // Telegram 针对 GIF 格式使用 document 形式发送时有可能无法获得正常的预览
   // 这里在图床场景下直接转为 JPEG 后缀上传作为折中处理方案
   if (file.type.startsWith('image/gif')) {
-    const newFileName = file.name.replace(/\\.gif$/, '.jpeg');
+    const newFileName = file.name.replace(/\.gif$/, '.jpeg');
     const newFile = new File([file], newFileName, { type: 'image/jpeg' });
     uploadFormData.append("document", newFile);
   } else {
     uploadFormData.append("document", file);
   }
-
   const telegramResponse = await fetch(
     `https://api.telegram.org/bot${config.tgBotToken}/sendDocument`,
     { method: 'POST', body: uploadFormData }
   );
-
   if (!telegramResponse.ok) {
     const errorData = await telegramResponse.json() as any;
     throw new Error(errorData.description || '上传到 Telegram 失败');
   }
-
   const responseData = await telegramResponse.json() as any;
   const fileId = responseData.result.video?.file_id
     || responseData.result.document?.file_id
     || responseData.result.sticker?.file_id;
-
   if (!fileId) throw new Error('返回的数据中没有文件 ID');
 
   const fileExtension = getFileExtension(file.name);
-
   const tagResult = await config.database.prepare('SELECT id FROM tags WHERE name = ?').bind(tagName).first();
   const tagId = tagResult?.id || null;
+
+  // 生成日期前缀，格式：YYMMDD，例如今天是 260612
+  const now = new Date();
+  const yy = String(now.getUTCFullYear()).slice(2);   // "26"
+  const mm = String(now.getUTCMonth() + 1).padStart(2, '0'); // "06"
+  const dd = String(now.getUTCDate()).padStart(2, '0');       // "12"
+  const datePrefix = `${yy}${mm}${dd}`;  // "260612"
 
   // 将记录写入 D1 数据库
   // 由于 url 列设置了 UNIQUE 约束，这里带有冲突重试机制（最多 5 次）
   let imagePath: string = '';
   let inserted = false;
   for (let i = 0; i < 5; i++) {
-    const uniqueId = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    const rand = crypto.randomUUID().slice(0, 6);  // 6位随机，防同一天冲突
     // 这里故意只存相对路径，防止绑定域名变更时图片地址失效
-    imagePath = `/${uniqueId}.${fileExtension}`;
+    // 格式：/260612-a3f9c1.jpg
+    imagePath = `/${datePrefix}-${rand}.${fileExtension}`;
     try {
       const result = await config.database.prepare(
         'INSERT INTO media (url, fileId, tag_id, filename, size) VALUES (?, ?, ?, ?, ?)'
@@ -71,6 +73,5 @@ export async function uploadToTelegram(
     }
   }
   if (!inserted) throw new Error('无法生成唯一路径，请重试');
-
   return { imagePath };
 }
