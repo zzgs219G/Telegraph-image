@@ -17,12 +17,10 @@ export const uploadFile = async (file: File, onProgress?: (percent: number) => v
   try {
     const url = adminMode ? '/admin/upload' : '/upload';
     const config: any = {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      },
       onUploadProgress: (progressEvent: { total?: number, loaded: number }) => {
-        if (progressEvent.total) {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        const total = progressEvent.total || progressEvent.loaded;
+        if (total > 0) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / total);
           if (onProgress) {
             onProgress(percentCompleted);
           }
@@ -30,7 +28,7 @@ export const uploadFile = async (file: File, onProgress?: (percent: number) => v
       }
     };
     if (adminMode && token) {
-      config.headers['Authorization'] = `Basic ${token}`;
+      config.headers = { Authorization: `Basic ${token}` };
     }
 
     const { data } = await api.post(url, formData, config);

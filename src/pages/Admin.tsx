@@ -10,7 +10,12 @@ import BatchBar from '../components/admin/BatchBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { toast } from 'sonner';
 
+/**
+ * 后台管理页面组件
+ * 提供登录认证、媒体文件列表、批量管理及标签系统的入口
+ */
 const AdminPage: React.FC = () => {
   const [token, setToken] = useState<string>('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -69,11 +74,12 @@ const AdminPage: React.FC = () => {
         setPage(res.pagination.page);
         setTotalPages(res.pagination.totalPages);
         setTotalCount(res.pagination.totalCount);
+        toast.success('登录成功');
       } else {
-        alert('认证失败');
+        toast.error('认证失败');
       }
     } catch {
-      alert('认证失败，请检查账号密码');
+      toast.error('认证失败，请检查账号密码');
     } finally {
       setIsLoading(false);
     }
@@ -88,13 +94,6 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (isAuthenticated && token) {
-      fetchTags();
-      loadPage(1, activeTagId);
-    }
-  }, [isAuthenticated, token, activeTagId]);
-
   const loadPage = async (newPage: number, tagId: number | null = activeTagId) => {
     setIsLoading(true);
     try {
@@ -106,11 +105,19 @@ const AdminPage: React.FC = () => {
         setTotalCount(res.pagination.totalCount);
       }
     } catch {
-      alert('加载失败');
+      toast.error('加载失败');
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      fetchTags();
+      loadPage(1, activeTagId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, token, activeTagId]);
 
   const toggleSelect = (url: string) => {
     const newSelected = new Set(selectedKeys);
@@ -126,10 +133,11 @@ const AdminPage: React.FC = () => {
     setIsSubmittingTag(true);
     try {
       await createTag(name, color, token);
+      toast.success('标签创建成功');
       await fetchTags();
       setIsTagModalOpen(false);
     } catch (e: any) {
-      alert(`创建失败: ${e.response?.data?.error || e.message}`);
+      toast.error(`创建失败: ${e.response?.data?.error || e.message}`);
     } finally {
       setIsSubmittingTag(false);
     }
@@ -140,11 +148,12 @@ const AdminPage: React.FC = () => {
     setIsDeletingTag(id);
     try {
       await deleteTag(id, token);
+      toast.success('删除标签成功');
       if (activeTagId === id) setActiveTagId(null);
       await fetchTags();
       await loadPage(page, activeTagId === id ? null : activeTagId);
     } catch (e: any) {
-      alert(`删除失败: ${e.message}`);
+      toast.error(`删除标签失败: ${e.message}`);
     } finally {
       setIsDeletingTag(null);
     }
@@ -154,24 +163,25 @@ const AdminPage: React.FC = () => {
     if (selectedKeys.size === 0) return;
     try {
       await batchTagMedia(Array.from(selectedKeys), tagId, token);
-      alert('批量操作成功');
+      toast.success('批量操作成功');
       setSelectedKeys(new Set());
       fetchTags();
       loadPage(page);
     } catch (e: any) {
-      alert(`操作失败: ${e.message}`);
+      toast.error(`操作失败: ${e.message}`);
     }
   };
 
   const handleTriggerBingCrawl = async () => {
     setIsCrawlingBing(true);
+    toast.info('开始抓取必应壁纸...');
     try {
       const res = await triggerBingCrawl(token);
-      alert(`抓取完成：成功 ${res.success} 张，跳过 ${res.skipped} 张已存在`);
+      toast.success(`抓取完成：成功 ${res.success} 张，跳过 ${res.skipped} 张已存在`);
       fetchTags();
       loadPage(1);
     } catch (e: any) {
-      alert(`抓取失败: ${e.message}`);
+      toast.error(`抓取失败: ${e.message}`);
     } finally {
       setIsCrawlingBing(false);
     }
@@ -185,12 +195,12 @@ const AdminPage: React.FC = () => {
     const res = await deleteAdminMedia(Array.from(selectedKeys), token);
     setIsLoading(false);
 
-    if (res.message) {
-      alert('删除成功');
+    if (res.message && !res.error) {
+      toast.success('删除成功');
       setSelectedKeys(new Set());
       loadPage(page);
     } else {
-      alert(`删除失败: ${res.error}`);
+      toast.error(`删除失败: ${res.error || '未知错误'}`);
     }
   };
 
@@ -203,54 +213,70 @@ const AdminPage: React.FC = () => {
     else if (format === 'bbcode') text = urls.map(u => `[img]${u}[/img]`).join('\\n\\n');
     else if (format === 'markdown') text = urls.map(u => `![image](${u})`).join('\\n\\n');
 
-    navigator.clipboard.writeText(text).then(() => alert('复制成功')).catch(() => alert('复制失败'));
+    navigator.clipboard.writeText(text).then(() => toast.success('复制成功')).catch(() => toast.error('复制失败'));
   };
 
   if (!isAuthenticated) {
     if (isLoading) {
       return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-50">
-          <div className="text-slate-500 text-sm animate-pulse">正在验证登录状态...</div>
+        <div className="flex items-center justify-center min-h-screen bg-transparent">
+          <div className="text-indigo-200 text-sm animate-pulse flex flex-col items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+            正在验证登录状态...
+          </div>
         </div>
       );
     }
 
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50">
-        <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-sm border border-slate-100">
-          <div className="flex justify-center mb-6">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" strokeWidth="2" className="text-indigo-600">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <polyline points="21 15 16 10 5 21"/>
-            </svg>
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-transparent relative z-10">
+        <div className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] w-full max-w-md border border-white/50 animate-in fade-in zoom-in-95 duration-500">
+          <div className="flex flex-col items-center mb-8">
+            <div className="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-4 transform rotate-3 hover:rotate-0 transition-transform">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"
+                fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+            </div>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">后台管理</h2>
+            <p className="text-sm text-slate-500 mt-1">Telegraph 图床系统</p>
           </div>
-          <h2 className="text-2xl font-bold mb-1 text-center text-slate-800">后台管理</h2>
-          <p className="text-sm text-slate-400 text-center mb-6">Telegraph 图床</p>
-          <form onSubmit={authenticate} className="space-y-4">
-            <Input
-              type="text"
-              placeholder="用户名"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              required
-              autoComplete="username"
-            />
-            <Input
-              type="password"
-              placeholder="密码"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
+          <form onSubmit={authenticate} className="space-y-5">
+            <div className="space-y-1">
+              <Input
+                type="text"
+                placeholder="用户名"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                required
+                autoComplete="username"
+                className="bg-white/50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all h-11"
+              />
+            </div>
+            <div className="space-y-1">
+              <Input
+                type="password"
+                placeholder="密码"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                className="bg-white/50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all h-11"
+              />
+            </div>
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full"
+              className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-md transition-all font-medium mt-2"
             >
-              {isLoading ? '验证中...' : '登录'}
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                  验证中...
+                </span>
+              ) : '进入控制台'}
             </Button>
           </form>
         </div>

@@ -27,7 +27,7 @@ export const CONTENT_TYPE_MAP: Record<string, string> = {
 
 export const CACHE_CONFIG = {
   HTML: 3600,
-  IMAGE: 86400,
+  IMAGE: 2592000,
   API: 300
 };
 

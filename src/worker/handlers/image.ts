@@ -1,41 +1,54 @@
 import { getFileExtension, CONTENT_TYPE_MAP, extractConfig, CACHE_CONFIG, getContentType } from '../utils';
 import type { Env } from '../utils';
 
+/**
+ * 处理所有静态图片的请求路由。
+ * 这是整个应用的核心功能之一：
+ * 1. 拦截对图片的请求，检查是否有缓存。
+ * 2. 如果无缓存，查询 D1 数据库获取该图片在 Telegram 的 `fileId`。
+ * 3. 通过 Telegram API 获取临时下载链接，并将图片抓取下来。
+ * 4. 写入 Cloudflare Cache (边缘节点缓存) 返回给用户，极大提升二次访问速度。
+ * 5. 如果路径不合法或者不是图片，回退(fallback)给 Vite 构建生成的静态资源。
+ */
 export async function handleImage(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const pathname = url.pathname;
 
-  // Check if it's potentially an image file based on extension
+  // 根据拓展名判断是否是潜在的媒体文件
   const extension = getFileExtension(pathname);
   if (CONTENT_TYPE_MAP[extension]) {
     const config = extractConfig(env);
 
-    // We only process it if it's an image. Otherwise, fallback to env.ASSETS.fetch
+    // 获取 Cache API 的实例
     const cache = (caches as any).default as Cache;
     const fullUrl = `https://${config.domain}${pathname}`;
 
-    // ⚡ 核心改动 1：构造一个带有缓存行为的请求对象
-    const cacheKey = new Request(fullUrl, {
+    // ⚡ 核心改动 1：构造纯 URL cache key，而 match 时加上 cf 对象
+    const cacheKey = new Request(fullUrl);
+    const matchKey = new Request(fullUrl, {
       cf: {
         cacheEverything: true,
         cacheTtl: CACHE_CONFIG.IMAGE
       }
     });
 
-    const cachedResponse = await cache.match(cacheKey);
+    const cachedResponse = await cache.match(matchKey);
     if (cachedResponse) return cachedResponse;
 
     try {
+      // 从 D1 查询图片绑定的 Telegram 文件 ID
       const result = await config.database.prepare(
         'SELECT fileId FROM media WHERE url = ?'
       ).bind(pathname).first();
 
       if (!result) {
-        return env.ASSETS.fetch(request); // Fallback to React static assets instead of immediately failing.
+        // 找不到，可能是 React 内部生成的带有文件后缀的资源(如字体)
+        return env.ASSETS.fetch(request);
       }
 
       const fileId = result.fileId;
       let filePath;
+      // Telegram GetFile API 有时会请求失败，增加 3 次重试机制提高稳定性
       for (let attempts = 0; attempts < 3; attempts++) {
         const getFilePath = await fetch(
           `https://api.telegram.org/bot${config.tgBotToken}/getFile?file_id=${fileId}`

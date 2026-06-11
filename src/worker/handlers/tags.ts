@@ -1,6 +1,11 @@
 import { extractConfig, authenticate, unauthorizedResponse, jsonResponse } from '../utils';
 import type { Env } from '../utils';
 
+/**
+ * 标签管理系统路由处理程序（多合一处理）。
+ * 包含了标签的 GET/POST/PATCH/DELETE API 逻辑。
+ * 删除标签时，媒体表 `media` 对应数据会被 `ON DELETE SET NULL` 自动清除其 tag_id，而不是级联删除。
+ */
 export async function handleTags(request: Request, env: Env): Promise<Response> {
   const method = request.method.toUpperCase();
   const url = new URL(request.url);
@@ -80,23 +85,6 @@ export async function handleTags(request: Request, env: Env): Promise<Response> 
       } catch (e: any) {
         return jsonResponse({ error: '更新标签失败', details: e.message }, 500);
       }
-    }
-  }
-
-  // PATCH /api/media/batch-tag
-  if (method === 'PATCH' && path === '/api/media/batch-tag') {
-    try {
-      const { urls, tag_id } = await request.json() as any;
-      if (!Array.isArray(urls) || urls.length === 0) return jsonResponse({ error: 'urls array required' }, 400);
-
-      const placeholders = urls.map(() => '?').join(',');
-      const bindValues = [tag_id === null ? null : tag_id, ...urls];
-      const query = `UPDATE media SET tag_id = ? WHERE url IN (${placeholders})`;
-
-      const result = await config.database.prepare(query).bind(...bindValues).run();
-      return jsonResponse({ message: '批量打标签成功', count: result.meta.changes });
-    } catch (e: any) {
-      return jsonResponse({ error: '批量打标签失败', details: e.message }, 500);
     }
   }
 

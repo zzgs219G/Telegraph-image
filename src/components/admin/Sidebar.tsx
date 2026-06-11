@@ -1,11 +1,5 @@
 import React from 'react';
-
-export interface Tag {
-  id: number;
-  name: string;
-  color: string;
-  count?: number;
-}
+import type { Tag } from '@/types';
 
 export interface SidebarProps {
   tags: Tag[];
