@@ -1,6 +1,11 @@
 import { extractConfig, authenticate, unauthorizedResponse, jsonResponse } from '../utils';
 import type { Env } from '../utils';
 
+/**
+ * 标签管理系统路由处理程序（多合一处理）。
+ * 包含了标签的 GET/POST/PATCH/DELETE API 逻辑。
+ * 删除标签时，媒体表 `media` 对应数据会被 `ON DELETE SET NULL` 自动清除其 tag_id，而不是级联删除。
+ */
 export async function handleTags(request: Request, env: Env): Promise<Response> {
   const method = request.method.toUpperCase();
   const url = new URL(request.url);

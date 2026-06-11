@@ -2,6 +2,10 @@ import { extractConfig, authenticate, unauthorizedResponse, jsonResponse } from 
 import type { Env } from '../utils';
 import { uploadToTelegram } from '../utils/telegram';
 
+/**
+ * 前台游客或鉴权上传接口处理逻辑。
+ * 根据环境变量决定是否需要认证，上传后打上"前台上传"标签。
+ */
 export async function handleUpload(request: Request, env: Env): Promise<Response> {
   const config = extractConfig(env);
 

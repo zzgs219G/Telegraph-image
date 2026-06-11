@@ -2,6 +2,10 @@ import { extractConfig, jsonResponse, authenticate, unauthorizedResponse } from 
 import type { Env } from '../utils';
 import { uploadToTelegram } from '../utils/telegram';
 
+/**
+ * 后台上传媒体接口处理逻辑。
+ * 要求管理员鉴权，统一将其打上"后台上传"的标签。
+ */
 export async function handleAdminUpload(request: Request, env: Env): Promise<Response> {
   const config = extractConfig(env);
 

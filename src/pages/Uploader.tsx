@@ -2,7 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { uploadFile } from '../services/api';
 import type { CachedUpload } from '../types';
 import { Clock, Info, Link as LinkIcon, Code, Type, Trash2, Minimize2, Maximize2, UploadCloud } from 'lucide-react';
+import { toast } from 'sonner';
 
+/**
+ * UploaderProps 定义了上传组件可能接收的参数
+ * @property {boolean} adminMode - 是否为后台上传模式
+ * @property {string} token - 后台上传认证 token
+ * @property {function} onUploadSuccess - 上传成功回调（用于后台刷新列表）
+ */
 export interface UploaderProps {
   adminMode?: boolean;
   token?: string;
@@ -108,10 +115,10 @@ const UploaderPage: React.FC<UploaderProps> = ({ adminMode, token, onUploadSucce
             localStorage.setItem('uploadCache', JSON.stringify(newCache));
           }
         } else if (res.error) {
-          alert(`上传失败: ${res.error}`);
+          toast.error(`上传失败: ${res.error}`);
         }
       } catch {
-        alert('上传过程中发生错误');
+        toast.error('上传过程中发生错误');
       } finally {
         setProgress(prev => {
           const next = { ...prev };
@@ -166,9 +173,9 @@ const UploaderPage: React.FC<UploaderProps> = ({ adminMode, token, onUploadSucce
     else if (format === 'markdown') text = urls.map(u => `![image](${u})`).join('\\n\\n');
 
     navigator.clipboard.writeText(text).then(() => {
-      alert('复制成功');
+      toast.success('复制成功');
     }).catch(() => {
-      alert('复制失败');
+      toast.error('复制失败');
     });
   };
 
@@ -186,10 +193,10 @@ const UploaderPage: React.FC<UploaderProps> = ({ adminMode, token, onUploadSucce
       <div className="relative bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl p-8 w-full max-w-lg mx-auto">
 
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent truncate pr-4">
             Telegraph图床
           </h1>
-          <div className="flex gap-2">
+          <div className="flex gap-2 shrink-0">
             <button
               onClick={() => setIsCompressing(!isCompressing)}
               className="p-2 text-indigo-400 hover:text-indigo-600 transition-colors"

@@ -1,6 +1,14 @@
 import { extractConfig, jsonResponse } from '../utils';
 import type { Env } from '../utils';
 
+/**
+ * 定时任务 / 手动触发抓取必应壁纸功能。
+ * 此函数会拉取 Bing 官方接口获取最近 8 天的高清壁纸。
+ * 将壁纸下载并转存到 Telegram，同时在 D1 中做好记录绑定。
+ *
+ * @param env - Cloudflare 环境绑定变量
+ * @param manual - 是否为后台用户手动点击触发（手动触发会返回 Response）
+ */
 export async function crawlBingWallpapers(env: Env, manual: boolean = false): Promise<Response | void> {
   const config = extractConfig(env);
 

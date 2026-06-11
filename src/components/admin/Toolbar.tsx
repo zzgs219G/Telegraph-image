@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import type { Tag } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 
 export interface ToolbarProps {
   searchTerm: string;
@@ -39,12 +40,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
         });
         const data = await res.json() as { data?: string; error?: string };
         if (data.data) {
+          toast.success('上传成功');
           onUploadSuccess(data.data);
         } else {
-          alert(`上传失败: ${data.error}`);
+          toast.error(`上传失败: ${data.error}`);
         }
       } catch {
-        alert('上传过程中发生错误');
+        toast.error('上传过程中发生错误');
       }
     }
     setIsUploading(false);

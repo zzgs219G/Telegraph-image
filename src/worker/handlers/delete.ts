@@ -1,6 +1,11 @@
 import { extractConfig, authenticate, unauthorizedResponse, jsonResponse } from '../utils';
 import type { Env } from '../utils';
 
+/**
+ * 批量删除媒体接口。
+ * 注意：此处仅删除 D1 中的记录，和清理边缘节点的 Cloudflare Cache，
+ * Telegram 上的原文件通常由于 Bot 限制或存储机制不在此进行直接清理。
+ */
 export async function handleDelete(request: Request, env: Env): Promise<Response> {
   const config = extractConfig(env);
 
