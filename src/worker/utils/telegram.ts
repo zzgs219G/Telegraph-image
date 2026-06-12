@@ -65,7 +65,7 @@ export async function uploadToTelegram(
     try {
       const result = await config.database.prepare(
         'INSERT INTO media (url, fileId, tag_id, filename, size) VALUES (?, ?, ?, ?, ?)'
-      ).bind(imagePath, fileId, tagId, file.name, file.size).run();
+      ).bind(imagePath, fileId, tagId, imagePath.slice(1), file.size).run();
       if (result.meta.changes > 0) { inserted = true; break; }
     } catch {
       // 若抛出 UNIQUE constraint 冲突，则继续下一次循环重试

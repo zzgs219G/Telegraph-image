@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { uploadFile } from '../services/api';
 import type { CachedUpload } from '../types';
-import { Clock, Link as LinkIcon, Code, Type, Trash2, Minimize2, Maximize2, UploadCloud } from 'lucide-react';
+import { Clock, Link as LinkIcon, Code, Type, Trash2, Minimize2, Maximize2, UploadCloud, ChevronLeft, Check, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
 export interface UploaderProps {
@@ -9,7 +9,6 @@ export interface UploaderProps {
   token?: string;
   onUploadSuccess?: (url: string) => void;
 }
-
 
 const calculateHash = async (file: File) => {
   if (!window.crypto || !window.crypto.subtle) {
@@ -20,8 +19,7 @@ const calculateHash = async (file: File) => {
   const arrayBuffer = await chunk.arrayBuffer();
   const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hash = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
-  return `${hash}-${file.size}-${file.lastModified}`;
+  return `${hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('')}-${file.size}-${file.lastModified}`;
 };
 
 const compressImage = async (file: File, quality = 0.75): Promise<File> => {
@@ -35,32 +33,89 @@ const compressImage = async (file: File, quality = 0.75): Promise<File> => {
       canvas.height = image.height;
       ctx.drawImage(image, 0, 0, image.width, image.height);
       canvas.toBlob((blob) => {
-        if (blob) {
-          resolve(new File([blob], file.name, { type: 'image/jpeg' }));
-        } else {
-          resolve(file);
-        }
+        resolve(blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file);
       }, 'image/jpeg', quality);
     };
     const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        image.src = event.target.result as string;
-      }
-    };
+    reader.onload = (e) => { if (e.target?.result) image.src = e.target.result as string; };
     reader.readAsDataURL(file);
   });
 };
 
+// ── URL Result Row ───────────────────────────────────────────────────────────
+const UrlRow: React.FC<{ url: string; index: number; onRemove: () => void }> = ({ url, index, onRemove }) => {
+  const [copied, setCopied] = useState(false);
+  const short = url.replace(/^https?:\/\//, '');
+
+  const copy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    });
+  };
+
+  return (
+    <div className="group flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/8 rounded-xl px-3.5 py-2.5 transition-all duration-200">
+      <span className="text-[10px] font-mono text-slate-500 w-4 text-center shrink-0">{index + 1}</span>
+      <span className="flex-1 text-xs font-mono text-slate-300 truncate select-all">{short}</span>
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={copy}
+          className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+          title="复制链接"
+        >
+          {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-colors"
+          title="移除"
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Thumbnail Grid ───────────────────────────────────────────────────────────
+const ThumbnailGrid: React.FC<{
+  thumbnails: { url: string; preview: string; type: string }[];
+  onRemove: (i: number) => void;
+}> = ({ thumbnails, onRemove }) => (
+  <div className="grid grid-cols-4 gap-2">
+    {thumbnails.map((t, idx) => (
+      <div key={idx} className="relative aspect-square rounded-xl overflow-hidden group border border-white/10 bg-white/5">
+        {t.type.startsWith('image/') ? (
+          <img src={t.preview} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="" />
+        ) : t.type.startsWith('video/') ? (
+          <video src={t.preview} className="w-full h-full object-cover" muted />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-slate-500 font-mono text-[10px] font-semibold tracking-widest">FILE</div>
+        )}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center">
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemove(idx); }}
+            className="p-1.5 rounded-lg bg-black/70 text-white opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all duration-150 scale-90 group-hover:scale-100"
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+// ── Main Component ───────────────────────────────────────────────────────────
 const UploaderPage: React.FC<UploaderProps> = ({ adminMode, token, onUploadSuccess }) => {
   const [urls, setUrls] = useState<string[]>([]);
-  const [thumbnails, setThumbnails] = useState<{ url: string, preview: string, type: string }[]>([]);
+  const [thumbnails, setThumbnails] = useState<{ url: string; preview: string; type: string }[]>([]);
   const [progress, setProgress] = useState<{ [key: string]: number }>({});
   const [isCompressing, setIsCompressing] = useState(true);
   const [showCache, setShowCache] = useState(false);
   const [cache, setCache] = useState<CachedUpload[]>(() => {
-    const localCache = localStorage.getItem('uploadCache');
-    return localCache ? JSON.parse(localCache) : [];
+    try { return JSON.parse(localStorage.getItem('uploadCache') || '[]'); } catch { return []; }
   });
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -68,41 +123,36 @@ const UploaderPage: React.FC<UploaderProps> = ({ adminMode, token, onUploadSucce
   const handleFiles = async (files: File[]) => {
     for (const file of files) {
       const fileHash = await calculateHash(file);
-      const existingCache = cache.find(c => c.hash === fileHash);
-      if (existingCache && !adminMode) {
-        if (!urls.includes(existingCache.url)) {
-          setUrls(prev => [...prev, existingCache.url]);
-        }
+      const existing = cache.find(c => c.hash === fileHash);
+      if (existing && !adminMode) {
+        if (!urls.includes(existing.url)) setUrls(prev => [...prev, existing.url]);
         continue;
       }
       const tempId = Math.random().toString(36).substring(7);
       setProgress(prev => ({ ...prev, [tempId]: 0 }));
       try {
-        let uploadableFile = file;
+        let uploadable = file;
         if (file.type.startsWith('image/') && file.type !== 'image/gif' && isCompressing) {
-          uploadableFile = await compressImage(file);
+          uploadable = await compressImage(file);
         }
-        const res = await uploadFile(uploadableFile, (p) => {
+        const res = await uploadFile(uploadable, (p) => {
           setProgress(prev => ({ ...prev, [tempId]: p }));
         }, adminMode, token);
         if (res.data) {
-          const newUrl = res.data;
-          setUrls(prev => [...prev, newUrl]);
-          if (onUploadSuccess) {
-            onUploadSuccess(newUrl);
-          }
+          setUrls(prev => [...prev, res.data!]);
+          onUploadSuccess?.(res.data!);
           if (!adminMode) {
             const preview = URL.createObjectURL(file);
-            setThumbnails(prev => [...prev, { url: newUrl, preview, type: file.type }]);
-            const newCacheItem: CachedUpload = {
-              url: newUrl,
+            setThumbnails(prev => [...prev, { url: res.data!, preview, type: file.type }]);
+            const item: CachedUpload = {
+              url: res.data!,
               fileName: file.name,
               hash: fileHash,
               timestamp: new Date().toLocaleString('zh-CN', { hour12: false })
             };
-            const newCache = [...cache, newCacheItem];
-            setCache(newCache);
-            localStorage.setItem('uploadCache', JSON.stringify(newCache));
+            const next = [...cache, item];
+            setCache(next);
+            localStorage.setItem('uploadCache', JSON.stringify(next));
           }
         } else if (res.error) {
           toast.error(`上传失败: ${res.error}`);
@@ -110,230 +160,303 @@ const UploaderPage: React.FC<UploaderProps> = ({ adminMode, token, onUploadSucce
       } catch {
         toast.error('上传过程中发生错误');
       } finally {
-        setProgress(prev => {
-          const next = { ...prev };
-          delete next[tempId];
-          return next;
-        });
+        setProgress(prev => { const n = { ...prev }; delete n[tempId]; return n; });
       }
     }
   };
 
   useEffect(() => {
-    const handlePaste = (e: ClipboardEvent) => {
-      if (e.clipboardData && e.clipboardData.items) {
+    const handler = (e: ClipboardEvent) => {
+      if (e.clipboardData?.items) {
         for (const item of Array.from(e.clipboardData.items)) {
           if (item.kind === 'file') {
             const file = item.getAsFile();
-            if (file) handleFiles([file]);
-            break;
+            if (file) { handleFiles([file]); break; }
           }
         }
       }
     };
-    window.addEventListener('paste', handlePaste);
-    return () => window.removeEventListener('paste', handlePaste);
+    window.addEventListener('paste', handler);
+    return () => window.removeEventListener('paste', handler);
   }, [isCompressing, cache, urls]);
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFiles(Array.from(e.dataTransfer.files));
-    }
-  };
-
-  const handleCopy = (format: 'url' | 'bbcode' | 'markdown') => {
+  const handleCopyAll = (format: 'url' | 'bbcode' | 'markdown') => {
     if (urls.length === 0) return;
-    let text = '';
-    if (format === 'url') text = urls.join('\n\n');
-    else if (format === 'bbcode') text = urls.map(u => `[img]${u}[/img]`).join('\n\n');
-    else if (format === 'markdown') text = urls.map(u => `![image](${u})`).join('\n\n');
-    navigator.clipboard.writeText(text).then(() => {
-      toast.success('复制成功');
-    }).catch(() => {
-      toast.error('复制失败');
-    });
+    const text =
+      format === 'url' ? urls.join('\n\n') :
+      format === 'bbcode' ? urls.map(u => `[img]${u}[/img]`).join('\n\n') :
+      urls.map(u => `![image](${u})`).join('\n\n');
+    navigator.clipboard.writeText(text)
+      .then(() => toast.success('已全部复制'))
+      .catch(() => toast.error('复制失败'));
   };
 
-  const removeThumbnail = (index: number) => {
-    const target = thumbnails[index];
-    URL.revokeObjectURL(target.preview);
-    setThumbnails(prev => prev.filter((_, i) => i !== index));
-    setUrls(prev => prev.filter(u => u !== target.url));
+  const removeThumbnail = (idx: number) => {
+    URL.revokeObjectURL(thumbnails[idx].preview);
+    const url = thumbnails[idx].url;
+    setThumbnails(prev => prev.filter((_, i) => i !== idx));
+    setUrls(prev => prev.filter(u => u !== url));
+  };
+
+  const removeUrl = (idx: number) => {
+    const url = urls[idx];
+    const tIdx = thumbnails.findIndex(t => t.url === url);
+    if (tIdx !== -1) {
+      URL.revokeObjectURL(thumbnails[tIdx].preview);
+      setThumbnails(prev => prev.filter((_, i) => i !== tIdx));
+    }
+    setUrls(prev => prev.filter((_, i) => i !== idx));
   };
 
   const activeProgress = Object.values(progress);
+  const hasResults = urls.length > 0;
+  const isUploading = activeProgress.length > 0;
 
   return (
     <div className="flex items-center justify-center min-h-screen p-6 font-sans">
-      <div className="relative bg-slate-900/40 backdrop-blur-2xl rounded-3xl shadow-[0_32px_64px_rgba(0,0,0,0.2)] border border-white/10 p-8 w-full max-w-xl mx-auto transition-all duration-300">
-        
-        {/* Header Section */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-white">
-              Telegraph <span className="text-slate-400 font-light">Cloud</span>
-            </h1>
-            <p className="text-xs text-slate-400/80 mt-1">简单、纯粹的轻量级图床系统</p>
-          </div>
-          <div className="flex gap-1 bg-white/5 p-1 rounded-xl border border-white/5">
-            <button
-              onClick={() => setIsCompressing(!isCompressing)}
-              className={`p-2 rounded-lg transition-all duration-200 ${isCompressing ? 'bg-white/10 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
-              title={isCompressing ? "已开启智能压缩" : "未开启压缩"}
-            >
-              {isCompressing ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-            </button>
-            <button
-              onClick={() => setShowCache(!showCache)}
-              className={`p-2 rounded-lg transition-all duration-200 ${showCache ? 'bg-white/10 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
-              title="上传历史记录"
-            >
-              <Clock size={18} />
-            </button>
-          </div>
-        </div>
+      {/* Card */}
+      <div className="relative w-full max-w-md">
 
-        {showCache ? (
-          /* History View */
-          <div className="space-y-2">
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-xs font-medium text-slate-400">历史记录 ({cache.length})</span>
-              <button onClick={() => setShowCache(false)} className="text-xs text-white/60 hover:text-white transition-colors">返回上传</button>
-            </div>
-            <div className="max-h-64 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-              {cache.length === 0 ? (
-                <p className="text-center text-sm text-slate-500 py-8">暂无历史上传记录</p>
+        {/* Ambient glow */}
+        <div className="absolute -inset-px rounded-3xl bg-gradient-to-br from-white/10 via-transparent to-white/5 pointer-events-none" />
+
+        <div className="relative bg-slate-950/60 backdrop-blur-3xl rounded-3xl border border-white/10 shadow-[0_24px_80px_rgba(0,0,0,0.5)] overflow-hidden">
+
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-6 pt-6 pb-0">
+            <div>
+              {showCache ? (
+                <button
+                  onClick={() => setShowCache(false)}
+                  className="flex items-center gap-1.5 text-slate-400 hover:text-white text-sm transition-colors mb-1"
+                >
+                  <ChevronLeft size={14} />
+                  <span>返回上传</span>
+                </button>
               ) : (
-                [...cache].reverse().map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-3 cursor-pointer transition-all text-left group"
-                    onClick={() => {
-                      setUrls([item.url]);
-                      setShowCache(false);
-                    }}
-                  >
-                    <div className="flex justify-between items-center mb-1">
-                      <div className="font-medium text-sm text-slate-200 truncate max-w-[70%]">{item.fileName}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">{item.timestamp}</div>
-                    </div>
-                    <div className="text-xs text-slate-400 truncate font-mono group-hover:text-slate-300">{item.url}</div>
-                  </div>
-                ))
+                <>
+                  <h1 className="text-lg font-semibold text-white tracking-tight leading-none">
+                    Telegraph <span className="text-slate-500 font-light">Cloud</span>
+                  </h1>
+                  <p className="text-[11px] text-slate-500 mt-1">轻量图床 · 基于 Telegram 存储</p>
+                </>
               )}
             </div>
-          </div>
-        ) : (
-          /* Main Upload View */
-          <>
-            <div
-              className={`border border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all duration-300 group relative overflow-hidden ${
-                isDragging 
-                  ? 'border-white bg-white/10 scale-[0.99]' 
-                  : 'border-white/20 bg-white/5 hover:border-white/40 hover:bg-white/8'
-              }`}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <input
-                type="file"
-                multiple
-                ref={fileInputRef}
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files) handleFiles(Array.from(e.target.files));
-                  e.target.value = '';
-                }}
-              />
-              <div className="relative z-10">
-                <UploadCloud className="mx-auto text-slate-400 group-hover:text-white transition-colors mb-4 duration-300" size={40} />
-                <p className="text-sm font-medium text-slate-200">将文件拖拽至此处，或 <span className="text-white underline underline-offset-4 decoration-white/30 hover:decoration-white">点击浏览</span></p>
-                <p className="text-xs text-slate-400/60 mt-2">支持多文件上传，可在页面任意位置直接 Ctrl+V 粘贴</p>
-              </div>
+
+            <div className="flex gap-1">
+              {!showCache && (
+                <button
+                  onClick={() => setIsCompressing(!isCompressing)}
+                  className={`p-2 rounded-xl text-xs transition-all duration-200 ${
+                    isCompressing
+                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                      : 'text-slate-500 hover:text-slate-300 border border-transparent'
+                  }`}
+                  title={isCompressing ? '智能压缩已开启' : '点击开启压缩'}
+                >
+                  {isCompressing ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                </button>
+              )}
+              <button
+                onClick={() => setShowCache(!showCache)}
+                className={`p-2 rounded-xl relative transition-all duration-200 ${
+                  showCache
+                    ? 'bg-white/10 text-white border border-white/10'
+                    : 'text-slate-500 hover:text-slate-300 border border-transparent'
+                }`}
+                title="上传历史"
+              >
+                <Clock size={15} />
+                {cache.length > 0 && !showCache && (
+                  <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-indigo-400 rounded-full" />
+                )}
+              </button>
             </div>
+          </div>
 
-            {/* Progress Bars */}
-            {activeProgress.length > 0 && (
-              <div className="mt-4 space-y-2 bg-white/5 rounded-xl p-3 border border-white/5">
-                {activeProgress.map((p, i) => (
-                  <div key={i} className="space-y-1">
-                    <div className="flex justify-between text-xs text-slate-300 font-mono">
-                      <span>正在上传资源...</span>
-                      <span>{p}%</span>
-                    </div>
-                    <div className="w-full bg-white/10 h-1 rounded-full overflow-hidden">
-                      <div className="bg-white h-full transition-all duration-300" style={{ width: `${p}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+          {/* Divider */}
+          <div className="mx-6 mt-4 mb-0 h-px bg-white/5" />
 
-            {/* Thumbnails */}
-            {thumbnails.length > 0 && (
-              <div className="flex flex-wrap gap-3 mt-6 justify-center">
-                {thumbnails.map((t, idx) => (
-                  <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden shadow-lg group border border-white/10 bg-slate-950">
-                    {t.type.startsWith('image/') ? (
-                      <img src={t.preview} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" alt="preview" />
-                    ) : t.type.startsWith('video/') ? (
-                      <video src={t.preview} className="w-full h-full object-cover" muted />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-400 font-mono text-xs font-semibold">FILE</div>
-                    )}
+          {/* Body */}
+          <div className="p-6 space-y-4">
+
+            {showCache ? (
+              /* ── History ── */
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs text-slate-500">共 {cache.length} 条记录</span>
+                  {cache.length > 0 && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); removeThumbnail(idx); }}
-                      className="absolute top-1 right-1 bg-black/70 text-white rounded-lg p-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 duration-200"
+                      onClick={() => {
+                        setCache([]);
+                        localStorage.removeItem('uploadCache');
+                      }}
+                      className="text-xs text-slate-600 hover:text-red-400 transition-colors"
                     >
-                      <Trash2 size={12} />
+                      清空
                     </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Result Showcase */}
-            {urls.length > 0 && (
-              <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="grid grid-cols-3 gap-2">
-                  <button onClick={() => handleCopy('url')} className="flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/20 text-white py-2 rounded-xl text-xs font-medium transition-all">
-                    <LinkIcon size={14} /> URL
-                  </button>
-                  <button onClick={() => handleCopy('bbcode')} className="flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/20 text-white py-2 rounded-xl text-xs font-medium transition-all">
-                    <Code size={14} /> BBCode
-                  </button>
-                  <button onClick={() => handleCopy('markdown')} className="flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/20 text-white py-2 rounded-xl text-xs font-medium transition-all">
-                    <Type size={14} /> Markdown
-                  </button>
+                  )}
                 </div>
-                <textarea
-                  readOnly
-                  value={urls.join('\n\n')}
-                  className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-xs font-mono text-slate-300 focus:outline-none focus:border-white/30 resize-none h-28 custom-scrollbar"
-                />
+                <div className="space-y-1.5 max-h-72 overflow-y-auto pr-0.5 -mr-1">
+                  {cache.length === 0 ? (
+                    <div className="py-12 text-center">
+                      <Clock size={24} className="mx-auto mb-3 text-slate-700" />
+                      <p className="text-sm text-slate-600">暂无历史记录</p>
+                    </div>
+                  ) : (
+                    [...cache].reverse().map((item, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => { setUrls([item.url]); setShowCache(false); }}
+                        className="w-full text-left group flex items-start gap-3 bg-white/3 hover:bg-white/8 border border-white/5 hover:border-white/10 rounded-xl px-3.5 py-2.5 transition-all duration-150"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-slate-200 font-medium truncate group-hover:text-white transition-colors">{item.fileName}</p>
+                          <p className="text-[10px] font-mono text-slate-500 truncate mt-0.5">{item.url}</p>
+                        </div>
+                        <span className="text-[10px] text-slate-600 font-mono shrink-0 mt-0.5">{item.timestamp.split(' ')[0]}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
-            )}
-          </>
-        )}
+            ) : (
+              /* ── Upload ── */
+              <>
+                {/* Drop zone */}
+                <div
+                  className={`relative rounded-2xl border-2 border-dashed transition-all duration-300 cursor-pointer overflow-hidden ${
+                    isDragging
+                      ? 'border-white/50 bg-white/8 scale-[0.99]'
+                      : isUploading
+                        ? 'border-indigo-500/40 bg-indigo-500/5'
+                        : 'border-white/12 bg-white/3 hover:border-white/25 hover:bg-white/6'
+                  }`}
+                  style={{ minHeight: hasResults ? 100 : 160 }}
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                  onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    if (e.dataTransfer.files.length > 0) handleFiles(Array.from(e.dataTransfer.files));
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    type="file"
+                    multiple
+                    ref={fileInputRef}
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files) handleFiles(Array.from(e.target.files));
+                      e.target.value = '';
+                    }}
+                  />
 
-        {/* Footer */}
-        <p className="text-center text-[11px] text-slate-500/80 mt-8">
-          Open Source via <a href="https://github.com/0-RTT/telegraph" target="_blank" rel="noreferrer" className="text-slate-400 hover:text-white hover:underline transition-colors">GitHub</a>
-        </p>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-6">
+                    {isUploading ? (
+                      <div className="w-full space-y-2.5">
+                        {activeProgress.map((p, i) => (
+                          <div key={i} className="space-y-1.5">
+                            <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                              <span className="flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse" />
+                                正在上传...
+                              </span>
+                              <span>{p}%</span>
+                            </div>
+                            <div className="h-0.5 w-full bg-white/8 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-indigo-500 to-violet-400 transition-all duration-300 rounded-full"
+                                style={{ width: `${p}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <>
+                        <UploadCloud
+                          size={hasResults ? 28 : 36}
+                          className={`transition-all duration-300 ${isDragging ? 'text-white scale-110' : 'text-slate-500 group-hover:text-slate-400'}`}
+                        />
+                        <div className="text-center">
+                          <p className="text-sm text-slate-300">
+                            拖拽文件至此，或{' '}
+                            <span className="text-white underline underline-offset-4 decoration-white/30">点击选择</span>
+                          </p>
+                          {!hasResults && (
+                            <p className="text-[11px] text-slate-600 mt-1">支持多文件 · 页面任意位置 Ctrl+V 粘贴</p>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Thumbnails */}
+                {thumbnails.length > 0 && (
+                  <ThumbnailGrid thumbnails={thumbnails} onRemove={removeThumbnail} />
+                )}
+
+                {/* Results */}
+                {hasResults && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-bottom-1 duration-200">
+                    {/* Action strip */}
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-[10px] text-slate-500 mr-auto">
+                        {urls.length} 个链接
+                      </span>
+                      <button
+                        onClick={() => handleCopyAll('url')}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/6 hover:bg-white/12 text-slate-400 hover:text-white text-[11px] transition-all border border-white/6 hover:border-white/12"
+                      >
+                        <LinkIcon size={11} /> URL
+                      </button>
+                      <button
+                        onClick={() => handleCopyAll('bbcode')}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/6 hover:bg-white/12 text-slate-400 hover:text-white text-[11px] transition-all border border-white/6 hover:border-white/12"
+                      >
+                        <Code size={11} /> BB
+                      </button>
+                      <button
+                        onClick={() => handleCopyAll('markdown')}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/6 hover:bg-white/12 text-slate-400 hover:text-white text-[11px] transition-all border border-white/6 hover:border-white/12"
+                      >
+                        <Type size={11} /> MD
+                      </button>
+                    </div>
+
+                    {/* URL list */}
+                    <div className="space-y-1.5 max-h-52 overflow-y-auto pr-0.5 -mr-1">
+                      {urls.map((url, i) => (
+                        <UrlRow key={url} url={url} index={i} onRemove={() => removeUrl(i)} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 pb-5 flex items-center justify-between">
+            <a
+              href="https://github.com/0-RTT/telegraph"
+              target="_blank"
+              rel="noreferrer"
+              className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors"
+            >
+              GitHub
+            </a>
+            {isCompressing && !showCache && (
+              <span className="text-[10px] text-emerald-600 flex items-center gap-1">
+                <span className="w-1 h-1 bg-emerald-500 rounded-full" />
+                智能压缩已开启
+              </span>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
