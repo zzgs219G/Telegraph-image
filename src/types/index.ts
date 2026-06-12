@@ -43,4 +43,6 @@ export interface CachedUpload {
   fileName: string;
   hash: string;
   timestamp: string;
+  /** Base64 缩略图，用于历史记录预览（96px 以内的 JPEG data URL） */
+  previewDataUrl?: string;
 }
