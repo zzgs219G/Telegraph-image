@@ -132,6 +132,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           multiple
           ref={fileInputRef}
           className="hidden"
+          accept="image/*,video/*"
           onChange={handleFileChange}
         />
         <Button

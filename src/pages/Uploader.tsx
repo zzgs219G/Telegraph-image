@@ -330,6 +330,7 @@ const UploaderPage: React.FC<UploaderProps> = ({ adminMode, token, onUploadSucce
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <input type="file" multiple ref={fileInputRef} className="hidden"
+                  accept="image/*,video/*"
                     onChange={(e) => { if (e.target.files) handleFiles(Array.from(e.target.files)); e.target.value = ''; }}
                   />
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-6">
